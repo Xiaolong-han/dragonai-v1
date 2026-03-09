@@ -206,7 +206,7 @@ marimo/_static/
 marimo/_lsp/
 __marimo__/
 .idea/
-storage/
+/storage/
 .env.env
 .coverage
 prompt_add_for_skill.md
