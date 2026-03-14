@@ -36,22 +36,23 @@
               <img 
                 v-for="(link, linkIndex) in part.tool.links" 
                 :key="linkIndex"
-                :src="link.url"
+                :src="getFullUrl(link.url)"
                 :alt="link.title"
                 class="tool-image"
+                @click="previewImage(getFullUrl(link.url))"
               />
             </div>
             <!-- 非图片工具：链接卡片 -->
             <div v-else-if="part.tool.links && part.tool.links.length > 0" class="tool-links">
               <template v-for="(link, linkIndex) in part.tool.links" :key="linkIndex">
                 <!-- 有 URL：显示为链接 -->
-                <a v-if="link.url" :href="link.url" target="_blank" class="link-card">
+                <a v-if="link.url" :href="getFullUrl(link.url)" target="_blank" class="link-card">
                   <div class="link-icon">
                     <el-icon><Link /></el-icon>
                   </div>
                   <div class="link-content">
-                    <div class="link-title">{{ link.title || getDomainFromUrl(link.url) }}</div>
-                    <div class="link-url">{{ getDomainFromUrl(link.url) }}</div>
+                    <div class="link-title">{{ link.title || getDomainFromUrl(getFullUrl(link.url)) }}</div>
+                    <div class="link-url">{{ getDomainFromUrl(getFullUrl(link.url)) }}</div>
                   </div>
                   <el-icon class="link-arrow"><ArrowRight /></el-icon>
                 </a>
@@ -109,6 +110,19 @@ interface Props {
 const props = defineProps<Props>()
 
 const expandedTools = reactive<Record<number, boolean>>({})
+
+const baseUrl = import.meta.env.VITE_API_BASE_URL || ''
+
+function getFullUrl(url: string): string {
+  if (!url) return ''
+  if (url.startsWith('http://') || url.startsWith('https://')) {
+    return url
+  }
+  if (url.startsWith('/api/')) {
+    return `${baseUrl}${url}`
+  }
+  return `${baseUrl}/api/v1/files/serve/${url}`
+}
 
 const toolNameMap: Record<string, string> = {
   'web_search': '网页搜索',
