@@ -68,6 +68,7 @@ class ModelFactory:
         is_expert: bool = False,
         enable_thinking: bool = False,
         use_cache: bool = True,
+        streaming: bool = True,
     ) -> ChatTongyi:
         """获取通用模型（连接池复用）
 
@@ -77,8 +78,9 @@ class ModelFactory:
             is_expert: 是否使用专家模型
             thinking: 是否启用深度思考
             use_cache: 是否使用缓存（默认True）
+            streaming: 是否启用流式输出（默认True，用于Agent）
         """
-        cache_key = f"general_{is_expert}_{enable_thinking}"
+        cache_key = f"general_{is_expert}_{enable_thinking}_{streaming}"
 
         if use_cache and cache_key in cls._chat_clients:
             logger.debug(f"[MODEL FACTORY] ChatTongyi cache hit: {cache_key}")
@@ -93,15 +95,18 @@ class ModelFactory:
         if enable_thinking:
             model_kwargs["enable_thinking"] = True
             # The incremental_output parameter must be "true" when enable_thinking is true under stream mode
-            model_kwargs["incremental_output"] = True
+            if streaming:
+                model_kwargs["incremental_output"] = True
         else:
             model_kwargs["enable_thinking"] = False
-            model_kwargs["incremental_output"] = True
+            # incremental_output only support stream call
+            if streaming:
+                model_kwargs["incremental_output"] = True
 
         client = ChatTongyi(
             model=model_name,
             dashscope_api_key=settings.qwen_api_key,
-            streaming=True,
+            streaming=streaming,
             temperature=0.3 if enable_thinking else 0.6,
             model_kwargs=model_kwargs if model_kwargs else None,
             request_timeout=60,

@@ -6,10 +6,21 @@ from pathlib import Path
 from typing import Optional, Union, Dict, Any
 
 from langchain.agents import create_agent
+from langchain.agents.middleware import (
+    SummarizationMiddleware,
+    ContextEditingMiddleware,
+    ClearToolUsesEdit,
+    LLMToolSelectorMiddleware,
+    ToolCallLimitMiddleware,
+    ToolRetryMiddleware,
+    ModelCallLimitMiddleware,
+    ModelFallbackMiddleware,
+)
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 
 from deepagents.middleware.skills import SkillsMiddleware
+from deepagents.middleware.patch_tool_calls import PatchToolCallsMiddleware
 from deepagents.backends.filesystem import FilesystemBackend
 
 from app.config import settings
@@ -139,8 +150,10 @@ class AgentFactory:
         
         使用缓存机制，相同配置的agent只创建一次，通过thread_id区分不同对话。
         
-        集成 Skills:
-        - SkillsMiddleware: 扫描技能目录，注入技能列表到系统提示
+        集成中间件: SkillsMiddleware, PatchToolCallsMiddleware, 
+        LLMToolSelectorMiddleware, ContextEditingMiddleware, 
+        SummarizationMiddleware, ToolCallLimitMiddleware,
+        ModelCallLimitMiddleware, ToolRetryMiddleware, ModelFallbackMiddleware
 
         Args:
             is_expert: 是否使用专家模型
@@ -155,24 +168,18 @@ class AgentFactory:
             logger.debug(f"[AGENT] Using cached agent: {cache_key}")
             return cls._agent_cache[cache_key]
         
-        model = ModelFactory.get_general_model(
+        main_model = ModelFactory.get_general_model(
             is_expert=is_expert,
             enable_thinking=enable_thinking
         )
-
-        checkpointer = cls.get_checkpointer()
         
-        skills_backend = cls._get_skills_backend()
+        middleware = cls._build_middleware()
         
-        middleware = [
-            SkillsMiddleware(backend=skills_backend, sources=["/skills/"]),
-        ]
-
         agent = create_agent(
-            model=model,
+            model=main_model,
             tools=ALL_TOOLS,
             system_prompt=SYSTEM_PROMPT,
-            checkpointer=checkpointer,
+            checkpointer=cls.get_checkpointer(),
             middleware=middleware,
         )
         
@@ -180,6 +187,26 @@ class AgentFactory:
         logger.debug(f"[AGENT] Created and cached agent: {cache_key}")
 
         return agent
+    
+    @classmethod
+    def _build_middleware(cls) -> list:
+        """构建Agent中间件列表"""
+        fallback_model = ModelFactory.get_general_model(is_expert=False, enable_thinking=False)
+        # 摘要模型使用非流式模式，避免流式输出到前端
+        summary_model = ModelFactory.get_general_model(is_expert=False, enable_thinking=False, streaming=False)
+        
+        return [
+            SkillsMiddleware(backend=cls._get_skills_backend(), sources=["/skills/"]),
+            PatchToolCallsMiddleware(),
+            ContextEditingMiddleware(edits=[
+                ClearToolUsesEdit(trigger=3000, keep=3, clear_tool_inputs=False, placeholder="[cleared]")
+            ]),
+            SummarizationMiddleware(model=summary_model, max_tokens_before_summary=4000, messages_to_keep=10),
+            ToolCallLimitMiddleware(run_limit=settings.agent_tool_call_limit, exit_behavior="end"),
+            ModelCallLimitMiddleware(run_limit=50, exit_behavior="end"),
+            ToolRetryMiddleware(max_retries=3, backoff_factor=2.0),
+            ModelFallbackMiddleware(fallback_model),
+        ]
 
     @classmethod
     async def warmup(cls):
@@ -243,33 +270,3 @@ class AgentFactory:
             "recursion_limit": settings.agent_recursion_limit
         }
 
-    @classmethod
-    async def reset_conversation_state(cls, conversation_id: str) -> bool:
-        """重置对话状态 (异步版本)
-        
-        清理指定对话的checkpointer状态，用于处理无效的tool_calls等问题。
-        
-        Args:
-            conversation_id: 对话ID
-            
-        Returns:
-            是否成功清理
-        """
-        try:
-            checkpointer = cls.get_checkpointer()
-            thread_id = f"conversation_{conversation_id}"
-            
-            if hasattr(checkpointer, 'adelete_thread'):
-                await checkpointer.adelete_thread(thread_id)
-                return True
-            elif hasattr(checkpointer, 'delete_thread'):
-                checkpointer.delete_thread(thread_id)
-                return True
-            elif hasattr(checkpointer, '_storage'):
-                if thread_id in checkpointer._storage:
-                    del checkpointer._storage[thread_id]
-                    return True
-            return False
-        except Exception as e:
-            logger.error(f"[AGENT] 重置对话状态失败: {e}")
-            return False

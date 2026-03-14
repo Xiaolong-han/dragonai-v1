@@ -2,8 +2,25 @@ import logging
 from typing import Dict, Any, Optional, List
 from langchain_core.messages.ai import AIMessageChunk
 from langchain_core.messages.tool import ToolMessage
+from langchain_core.messages.human import HumanMessage
 
 logger = logging.getLogger(__name__)
+
+
+def _is_summarization_message(message) -> bool:
+    """检查消息是否来自 SummarizationMiddleware
+    
+    检查方式：
+    1. 消息是 HumanMessage
+    2. 消息的 additional_kwargs 中有 lc_source=summarization
+    """
+    if not isinstance(message, HumanMessage):
+        return False
+    
+    additional_kwargs = getattr(message, 'additional_kwargs', {}) or {}
+    lc_source = additional_kwargs.get('lc_source')
+    
+    return lc_source == 'summarization'
 
 
 class MessageFormatter:
@@ -46,6 +63,9 @@ class MessageFormatter:
         Returns:
             格式化后的消息字典，如果不需要输出则返回 None
         """
+        # 检查是否是摘要消息，如果是则不输出到前端
+        if _is_summarization_message(message):
+            return None 
         if isinstance(message, AIMessageChunk):
             tool_call_chunks = getattr(message, 'tool_call_chunks', None)
             if tool_call_chunks:
