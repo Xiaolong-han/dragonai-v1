@@ -20,13 +20,15 @@ class StreamProcessor:
         agent,
         config: Dict,
         full_context: str,
-        enable_thinking: bool
+        enable_thinking: bool,
+        context = None
     ) -> AsyncGenerator[Dict[str, Any], None]:
         """统一的 Agent 流处理逻辑"""
         
         async for stream_mode, data in agent.astream(
             {"messages": [{"role": "user", "content": full_context}]},
             config,
+            context=context,
             stream_mode=["messages", "updates"]
         ):
             if stream_mode == "messages":
@@ -67,14 +69,14 @@ class StreamProcessor:
                 is_expert=is_expert,
                 enable_thinking=enable_thinking
             )
-            config = agent_factory.get_agent_config(str(conversation_id), user_id=user_id)
+            config, context = agent_factory.get_agent_config(str(conversation_id), user_id=user_id)
 
             logger.debug(f"[STREAM] 开始流式执行Agent")
             
             try:
                 async with asyncio.timeout(settings.agent_timeout):
                     async for event in self.process_agent_stream(
-                        agent, config, full_context, enable_thinking
+                        agent, config, full_context, enable_thinking, context
                     ):
                         yield event
             except asyncio.TimeoutError:

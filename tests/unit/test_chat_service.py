@@ -119,7 +119,7 @@ class TestChatService:
     async def test_generate_sse_stream(self, db_session, test_user, test_conversation, mock_redis, mock_agent_factory_stream):
         with patch('app.agents.agent_factory.AgentFactory') as mock_factory:
             mock_factory.create_chat_agent.return_value = mock_agent_factory_stream
-            mock_factory.get_agent_config.return_value = {"configurable": {"thread_id": "test"}}
+            mock_factory.get_agent_config.return_value = ({"configurable": {"thread_id": "test"}}, None)
             
             chunks = []
             async for chunk in chat_service.generate_sse_stream(

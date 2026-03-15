@@ -138,16 +138,23 @@ class TestAgentFactoryConfig:
 
     def test_get_agent_config_format(self):
         """测试 Agent 配置格式"""
-        config = AgentFactory.get_agent_config("123")
+        config, context = AgentFactory.get_agent_config("123")
         
         assert "configurable" in config
         assert "thread_id" in config["configurable"]
         assert config["configurable"]["thread_id"] == "conversation_123"
-        assert "recursion_limit" in config
+        assert context is None
 
     def test_get_agent_config_different_ids(self):
         """测试不同对话 ID 生成不同配置"""
-        config1 = AgentFactory.get_agent_config("123")
-        config2 = AgentFactory.get_agent_config("456")
+        config1, _ = AgentFactory.get_agent_config("123")
+        config2, _ = AgentFactory.get_agent_config("456")
         
         assert config1["configurable"]["thread_id"] != config2["configurable"]["thread_id"]
+
+    def test_get_agent_config_with_user_id(self):
+        """测试带用户 ID 的配置"""
+        config, context = AgentFactory.get_agent_config("123", user_id=42)
+        
+        assert context is not None
+        assert context.user_id == "42"

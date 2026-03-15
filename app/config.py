@@ -31,8 +31,8 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     log_dir: str = "./logs"
 
-    model_general_fast: str = "deepseek-v3"
-    model_general_expert: str = "deepseek-v3.1"
+    model_general_fast: str = "deepseek-r1-0528"
+    model_general_expert: str = "deepseek-r1"
 
     model_vision_ocr: str = "qwen-vl-ocr"
     model_vision_general: str = "qwen3-vl-plus"
@@ -50,7 +50,6 @@ class Settings(BaseSettings):
 
     model_embedding: str = "text-embedding-v4"
 
-    agent_recursion_limit: int = 25
     agent_tool_call_limit: int = 10
     agent_timeout: int = 120
 

@@ -33,8 +33,10 @@ async def lifespan(app: FastAPI):
     logger = logging.getLogger()
     logger.info("Starting DragonAI...")
 
-    await AgentFactory.init_backends()
-    logger.info("Backends initialized")
+    await AgentFactory.init_checkpointer()
+    logger.info("checkpointer initialized")
+    await AgentFactory.init_store()
+    logger.info("store initialized")
     try:
         await AgentFactory.warmup()
     except Exception as e:
@@ -46,7 +48,8 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"[CACHE WARMUP] Cache warmup failed, continuing startup: {e}")
     yield
-    await AgentFactory.close_backends()
+    await AgentFactory.close_checkpointer()
+    await AgentFactory.close_store()
     await ModelFactory.close_all()
     await redis_client.close()
     await close_db()
@@ -58,7 +61,7 @@ def create_app():
     app = FastAPI(
         title="DragonAI API",
         description="DragonAI - 智能AI助手",
-        version="2.0.0",
+        version="1.0.0",
         lifespan=lifespan
     )
     
