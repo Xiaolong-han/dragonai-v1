@@ -1,7 +1,9 @@
-
 <template>
   <div class="message-list" ref="messageListRef">
-    <el-empty v-if="messages.length === 0 && !loading" description="暂无消息，开始对话吧！" />
+    <EmptyChatState 
+      v-if="messages.length === 0 && !loading" 
+      @select-prompt="handleSelectPrompt"
+    />
     <div v-else-if="loading" class="loading-container">
       <el-icon class="is-loading" :size="40"><Loading /></el-icon>
     </div>
@@ -23,6 +25,7 @@
 import { ref, watch, nextTick, onMounted } from 'vue'
 import { Loading } from '@element-plus/icons-vue'
 import ChatMessageBubble from './ChatMessageBubble.vue'
+import EmptyChatState from './EmptyChatState.vue'
 import type { ChatMessage } from '@/stores/chat'
 import { useChatStore } from '@/stores/chat'
 
@@ -35,6 +38,7 @@ interface Props {
 const props = defineProps<Props>()
 const emit = defineEmits<{
   regenerate: [index: number]
+  selectPrompt: [prompt: string]
 }>()
 const messageListRef = ref<HTMLElement | null>(null)
 const chatStore = useChatStore()
@@ -53,6 +57,10 @@ function handleRegenerate(index: number) {
 
 function handleToggleThinking(messageId: number) {
   chatStore.toggleThinkingExpanded(messageId)
+}
+
+function handleSelectPrompt(prompt: string) {
+  emit('selectPrompt', prompt)
 }
 
 watch(
@@ -85,7 +93,7 @@ onMounted(() => {
 
 /* 自定义滚动条样式 */
 .message-list::-webkit-scrollbar {
-  width: 6px;
+  width: 4px;
 }
 
 .message-list::-webkit-scrollbar-track {
@@ -93,12 +101,12 @@ onMounted(() => {
 }
 
 .message-list::-webkit-scrollbar-thumb {
-  background: #c0c4cc;
-  border-radius: 3px;
+  background: var(--border-color);
+  border-radius: 2px;
 }
 
 .message-list::-webkit-scrollbar-thumb:hover {
-  background: #909399;
+  background: var(--text-tertiary);
 }
 
 .loading-container {
@@ -109,7 +117,7 @@ onMounted(() => {
 }
 
 .loading-container .el-icon {
-  color: #409eff;
+  color: var(--primary-color);
 }
 
 .messages-container {

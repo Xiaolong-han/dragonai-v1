@@ -443,10 +443,8 @@ function handleKeydown(event: KeyboardEvent) {
 
 <style scoped>
 .chat-input-wrapper {
-  padding: 16px 24px 24px;
+  padding: 12px 40px 12px;
   background: transparent;
-  max-width: 900px;
-  margin: 0 auto;
   width: 100%;
 }
 
@@ -562,7 +560,7 @@ function handleKeydown(event: KeyboardEvent) {
 
 /* 输入区域 */
 .input-area {
-  padding: 12px 16px;
+  padding: 12px 24px;
   position: relative;
 }
 
@@ -589,7 +587,7 @@ function handleKeydown(event: KeyboardEvent) {
 .tool-menu {
   position: absolute;
   bottom: 100%;
-  left: 16px;
+  left: 8px;
   margin-bottom: 8px;
   background: var(--bg-primary);
   border-radius: 12px;
@@ -634,7 +632,7 @@ function handleKeydown(event: KeyboardEvent) {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 12px 12px;
+  padding: 8px 16px 12px;
   border-top: 1px solid var(--border-light);
 }
 
@@ -678,9 +676,9 @@ function handleKeydown(event: KeyboardEvent) {
 }
 
 .tool-item.thinking-toggle.active {
-  background: var(--success-light-bg, rgba(103, 194, 58, 0.1));
-  color: var(--success-color, #67c23a);
-  border: 1px solid var(--success-light-border, rgba(103, 194, 58, 0.2));
+  background: var(--primary-light-bg, rgba(45, 125, 255, 0.1));
+  color: var(--primary-color, #2d7dff);
+  border: 1px solid var(--primary-light-border, rgba(45, 125, 255, 0.2));
 }
 
 .tool-item.model-select:hover,
@@ -693,7 +691,7 @@ function handleKeydown(event: KeyboardEvent) {
 }
 
 .tool-item.thinking-toggle.active:hover {
-  background: var(--success-light-bg, rgba(103, 194, 58, 0.1));
+  background: var(--primary-light-bg, rgba(45, 125, 255, 0.1));
 }
 
 .upload-btn {

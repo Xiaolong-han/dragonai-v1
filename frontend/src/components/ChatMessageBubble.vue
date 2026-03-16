@@ -118,27 +118,18 @@ function toggleThinking() {
   display: flex;
   gap: 16px;
   margin-bottom: 24px;
-  max-width: 90%;
+  width: 100%;
 }
 
 .user-message {
   flex-direction: row-reverse;
-  margin-left: auto;
-}
-
-.assistant-message {
-  margin-right: auto;
 }
 
 .message-avatar {
-  width: 44px;
-  height: 44px;
-  border-radius: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  width: 0;
+  height: 0;
+  overflow: hidden;
   flex-shrink: 0;
-  box-shadow: var(--shadow-sm);
 }
 
 .user-message .message-avatar {

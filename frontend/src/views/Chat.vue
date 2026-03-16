@@ -6,6 +6,7 @@
         :loading="chatStore.loading" 
         :conversation-id="currentConversationId"
         @regenerate="handleRegenerate"
+        @select-prompt="handleSelectPrompt"
       />
       <ChatInput
         :loading="isCurrentSending"
@@ -13,20 +14,19 @@
         @send="handleSendMessage"
       />
     </template>
-    <div v-else class="no-conversation">
-      <el-empty description="请选择或创建一个对话" />
-    </div>
+    <WelcomePage v-else />
   </div>
 </template>
 
 <script setup lang="ts">
-import { watch, onMounted, computed } from 'vue'
+import { watch, onMounted, computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { useConversationStore } from '@/stores/conversation'
 import { useChatStore } from '@/stores/chat'
 import ChatMessageList from '@/components/ChatMessageList.vue'
 import ChatInput from '@/components/ChatInput.vue'
+import WelcomePage from '@/components/WelcomePage.vue'
 
 interface Props {
   conversationId?: string
@@ -40,6 +40,9 @@ const chatStore = useChatStore()
 
 const { currentConversationId } = storeToRefs(conversationStore)
 
+// 标记是否已经处理了初始消息，防止重复发送
+const initialMessageProcessed = ref(false)
+
 const isCurrentSending = computed(() => {
   return currentConversationId.value ? chatStore.isSending(currentConversationId.value) : false
 })
@@ -51,6 +54,39 @@ function getConversationIdFromRoute(): number | null {
     return isNaN(numId) ? null : numId
   }
   return null
+}
+
+// 处理 URL 中的初始消息参数
+async function handleInitialMessage() {
+  const message = route.query.message as string
+  if (!message || initialMessageProcessed.value) return
+
+  initialMessageProcessed.value = true
+  const decodedMessage = decodeURIComponent(message)
+
+  try {
+    // 创建新会话
+    const conversation = await conversationStore.createConversation({
+      title: decodedMessage.slice(0, 20) + '...'
+    })
+
+    if (conversation && conversation.id) {
+      // 先清除 URL 参数，避免刷新时重复发送
+      await router.replace({
+        path: `/chat/${conversation.id}`,
+        query: {}
+      })
+
+      // 设置当前会话
+      conversationStore.selectConversation(conversation.id)
+      chatStore.setCurrentConversation(conversation.id)
+
+      // 发送消息
+      await chatStore.sendMessage(conversation.id, decodedMessage)
+    }
+  } catch (error) {
+    console.error('发送初始消息失败:', error)
+  }
 }
 
 // 同步路由到状态
@@ -67,6 +103,11 @@ async function syncFromRoute() {
   } else {
     conversationStore.currentConversationId = null
     chatStore.setCurrentConversation(null)
+
+    // 检查是否有初始消息参数，有则创建会话并发送
+    if (route.query.message && !initialMessageProcessed.value) {
+      await handleInitialMessage()
+    }
   }
 }
 
@@ -75,6 +116,16 @@ watch(
   () => route.params.conversationId,
   syncFromRoute,
   { immediate: true }
+)
+
+// 监听 query 参数变化（处理从 WelcomePage 点击提示词的情况）
+watch(
+  () => route.query.message,
+  async (newMessage) => {
+    if (newMessage && !initialMessageProcessed.value && !getConversationIdFromRoute()) {
+      await handleInitialMessage()
+    }
+  }
 )
 
 // 监听当前会话ID变化（处理新建会话的情况）
@@ -113,6 +164,11 @@ function handleRegenerate(messageIndex: number) {
   chatStore.regenerateMessage(currentConversationId.value, messageIndex)
 }
 
+function handleSelectPrompt(prompt: string) {
+  if (!currentConversationId.value) return
+  chatStore.sendMessage(currentConversationId.value, prompt)
+}
+
 onMounted(() => {
   syncFromRoute()
 })
@@ -131,12 +187,5 @@ onMounted(() => {
   flex: 1;
   overflow-y: auto;
   min-height: 0;
-}
-
-.no-conversation {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
 }
 </style>
