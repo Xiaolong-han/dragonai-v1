@@ -15,14 +15,14 @@ async def code_assist(prompt: str, language: str = "python") -> str:
 
     Args:
         prompt: 编程需求描述。详细说明需要实现什么功能或解决什么问题。
-                示例: "写一个快速排序算法"、"实现一个HTTP请求函数"
-        language: 编程语言名称。支持: python, javascript, java, c++, go, rust, typescript 等。
-                  默认值: "python"
+                示例："写一个快速排序算法"、"实现一个 HTTP 请求函数"
+        language: 编程语言名称。支持：python, javascript, java, c++, go, rust, typescript 等。
+                  默认值："python"
 
     Returns:
-        完整代码及解释说明（JSON格式）
+        完整代码及解释说明（JSON 格式）
     """
-    model = ModelFactory.get_coder_model(is_plus=False)
+    model = ModelFactory.get_coder_model()
     messages = [
         {"role": "system", "content": f"""你是一个专业的{language}编程助手。
 请提供清晰、高效、有注释的代码，并解释关键逻辑。
@@ -33,11 +33,19 @@ async def code_assist(prompt: str, language: str = "python") -> str:
 3. 格式清晰，使用 markdown 代码块"""},
         {"role": "user", "content": prompt}
     ]
-    result = await model.ainvoke(messages)
-    
-    return json.dumps({
-        "type": "code",
-        "language": language,
-        "prompt": prompt,
-        "code": result.content
-    })
+    try:
+        result = await model.ainvoke(messages)
+        
+        return json.dumps({
+            "type": "code",
+            "language": language,
+            "prompt": prompt,
+            "code": result.content
+        })
+    except Exception as e:
+        return json.dumps({
+            "type": "error",
+            "language": language,
+            "prompt": prompt,
+            "error": str(e)
+        })

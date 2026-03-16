@@ -15,6 +15,21 @@ from langchain_community.chat_models import ChatTongyi
 from langchain_community.embeddings import DashScopeEmbeddings
 
 from app.config import settings
+from app.llm.text_models import (
+    DashScopeModel,
+    DashScopeTextModel,
+    DashScopeCoderModel,
+    DashScopeTranslationModel,
+    QwenOCRModel,
+    QwenVisionModel,
+)
+from app.llm.image_models import (
+    DashScopeImageModel,
+    QwenImageGenerationModel,
+    QwenImageEditModel,
+    WanxImageGenerationModelV2,
+    WanxImageEditModelV2_5,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -120,85 +135,80 @@ class ModelFactory:
         return client
 
     @classmethod
-    def get_vision_model(cls, is_ocr: bool = False, **kwargs) -> "AsyncToolModel":
-        """获取视觉模型
-
+    def get_vision_model(cls, is_ocr: bool = False, **kwargs) -> DashScopeModel:
+        """获取视觉模型 - 统一使用一个模型
+        
         Args:
-            is_ocr: 是否使用OCR专用模型
+            is_ocr: 是否使用 OCR 专用模型
         """
         model_name = (
             settings.model_vision_ocr if is_ocr
-            else settings.model_vision_general
+            else settings.model_vision
         )
-        return AsyncToolModel(
+        return QwenVisionModel(
             model_name=model_name,
             api_key=settings.qwen_api_key,
             **kwargs
         )
-
+    
     @classmethod
-    def get_image_model(cls, is_turbo: bool = True, **kwargs):
-        """获取图像生成模型
-
-        注意：图像生成模型使用阿里云百炼多模态生成API，不是OpenAI接口
-
-        Args:
-            is_turbo: 是否使用快速模型
+    def get_text_to_image_model(cls, **kwargs) -> DashScopeImageModel:
+        """获取图像生成模型 - 统一使用一个模型
+        
+        根据配置的模型名称自动选择 Qwen 或 Wanx 系列
         """
-        from app.llm.qwen_models import QwenImageModel
-
-        model_name = (
-            settings.model_image_fast if is_turbo
-            else settings.model_image_expert
-        )
-        return QwenImageModel(
-            model_name=model_name,
-            api_key=settings.qwen_api_key
-        )
-
+        model_name = settings.model_text_to_image
+        
+        # 根据模型名称前缀选择正确的模型类
+        if model_name.startswith("wan"):
+            return WanxImageGenerationModelV2(
+                model_name=model_name,
+                api_key=settings.qwen_api_key,
+                **kwargs
+            )
+        else:
+            return QwenImageGenerationModel(
+                model_name=model_name,
+                api_key=settings.qwen_api_key,
+                **kwargs
+            )
+    
     @classmethod
-    def get_image_edit_model(cls, **kwargs):
-        """获取图像编辑模型
-
-        注意：图像编辑使用专门的 qwen-image-edit 模型
+    def get_image_edit_model(cls, **kwargs) -> DashScopeImageModel:
+        """获取图像编辑模型 - 根据配置选择模型类型
+        
+        注意：图像编辑使用专门的模型
         """
-        from app.llm.qwen_models import QwenImageModel
-
-        return QwenImageModel(
-            model_name=settings.model_image_edit,
-            api_key=settings.qwen_api_key
-        )
-
+        model_name = settings.model_image_edit
+        
+        # 根据模型名称前缀选择正确的模型类
+        if model_name.startswith("wan"):
+            return WanxImageEditModelV2_5(
+                model_name=model_name,
+                api_key=settings.qwen_api_key,
+                **kwargs
+            )
+        else:
+            return QwenImageEditModel(
+                model_name=model_name,
+                api_key=settings.qwen_api_key,
+                **kwargs
+            )
+    
     @classmethod
-    def get_coder_model(cls, is_plus: bool = False, **kwargs) -> "AsyncToolModel":
-        """获取编程模型
-
-        Args:
-            is_plus: 是否使用专家模型
-        """
-        model_name = (
-            settings.model_coder_expert if is_plus
-            else settings.model_coder_fast
-        )
-        return AsyncToolModel(
-            model_name=model_name,
+    def get_coder_model(cls, **kwargs) -> DashScopeModel:
+        """获取编程模型 - 统一使用一个模型"""
+        return DashScopeCoderModel(
+            model_name=settings.model_coder,
             api_key=settings.qwen_api_key,
             **kwargs
         )
-
+    
     @classmethod
-    def get_translation_model(cls, is_plus: bool = False, **kwargs) -> "AsyncToolModel":
-        """获取翻译模型
-
-        Args:
-            is_plus: 是否使用专家模型
-        """
-        model_name = (
-            settings.model_translation_expert if is_plus
-            else settings.model_translation_fast
-        )
-        return AsyncToolModel(
-            model_name=model_name,
+    def get_translation_model(cls, **kwargs) -> DashScopeModel:
+        """获取翻译模型 - 统一使用一个模型"""
+        return DashScopeTranslationModel(
+            model_name=settings.model_translation,
             api_key=settings.qwen_api_key,
             **kwargs
         )
@@ -242,58 +252,3 @@ class ModelFactory:
             "total_chat": len(cls._chat_clients),
             "total_async": len(cls._async_clients),
         }
-
-
-class AsyncToolModel:
-    """异步工具模型 - 用于直接工具触发的模型（视觉/编程/翻译等）
-
-    使用共享的连接池，支持重试机制
-    """
-
-    def __init__(
-        self,
-        model_name: str,
-        api_key: str = None,
-        base_url: str = None,
-        temperature: float = 0.7,
-        max_tokens: int = None,
-        top_p: float = None,
-    ):
-        self.model_name = model_name
-        self.api_key = api_key or settings.qwen_api_key
-        self.base_url = base_url or settings.qwen_base_url
-        self.temperature = temperature
-        self.max_tokens = max_tokens
-        self.top_p = top_p
-
-        if not self.api_key:
-            raise ValueError("Qwen API key is required. Set qwen_api_key in config or environment.")
-
-    async def _get_async_client(self) -> AsyncOpenAI:
-        """获取异步客户端（使用连接池）"""
-        return await ModelFactory.get_async_client(
-            api_key=self.api_key,
-            base_url=self.base_url,
-            timeout=60.0,
-            max_retries=3
-        )
-
-    async def ainvoke(self, messages: List[Dict[str, Any]], **kwargs) -> Any:
-        """异步调用模型"""
-        client = await self._get_async_client()
-
-        request_kwargs = {
-            "model": self.model_name,
-            "messages": messages,
-            "temperature": self.temperature,
-        }
-
-        if self.max_tokens:
-            request_kwargs["max_tokens"] = self.max_tokens
-        if self.top_p:
-            request_kwargs["top_p"] = self.top_p
-
-        request_kwargs.update(kwargs)
-
-        response = await client.chat.completions.create(**request_kwargs)
-        return response.choices[0].message

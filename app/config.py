@@ -21,7 +21,6 @@ class Settings(BaseSettings):
 
     qwen_api_key: str = ""
     qwen_base_url: str = "https://dashscope.aliyuncs.com/compatible-mode/v1"
-    qwen_image_base_url: str = "https://dashscope.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation"
 
     tavily_api_key: str = ""
 
@@ -35,18 +34,23 @@ class Settings(BaseSettings):
     model_general_expert: str = "deepseek-r1"
 
     model_vision_ocr: str = "qwen-vl-ocr"
-    model_vision_general: str = "qwen3-vl-plus"
-
-    model_image_fast: str = "qwen-image"
-    model_image_expert: str = "qwen-image-plus"
-
+    model_vision: str = "qwen3-vl-plus"
+    """
+    文本到图像模型:qwen-image, qwen-image-plus, qwen-image-max, qwen-image-2.0,qwen-image-2.0-pro
+                wan2.5-t2i-preview,wan2.2-t2i-flash,wan2.2-t2i-plus,wanx2.1-t2i-turbo, 
+                wanx2.1-t2i-plus,z-image-turbo
+    """
+    model_text_to_image: str = "wanx2.1-t2i-turbo"
+    """
+    图像编辑模型:qwen-image-edit, qwen-image-edit-plus,
+                qwen-image-edit-max,
+                qwen-image-2.0,qwen-image-2.0-pro
+    """
     model_image_edit: str = "qwen-image-edit"
 
-    model_coder_fast: str = "qwen3-coder-flash"
-    model_coder_expert: str = "qwen3-coder-plus"
+    model_coder: str = "qwen3-coder-flash"
 
-    model_translation_fast: str = "qwen-mt-flash"
-    model_translation_expert: str = "qwen-mt-plus"
+    model_translation: str = "qwen-mt-flash"
 
     model_embedding: str = "text-embedding-v4"
 

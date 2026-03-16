@@ -32,26 +32,37 @@ async def get_tool_models():
         ToolModelResponse(
             tool_type="coder",
             display_name="编程工具",
-            fast_model=settings.model_coder_fast,
-            expert_model=settings.model_coder_expert
+            model=settings.model_coder
         ),
         ToolModelResponse(
             tool_type="translation",
             display_name="翻译工具",
-            fast_model=settings.model_translation_fast,
-            expert_model=settings.model_translation_expert
+            model=settings.model_translation
         ),
         ToolModelResponse(
             tool_type="image",
             display_name="图像生成",
-            fast_model=settings.model_image_fast,
-            expert_model=settings.model_image_expert
+            model=settings.model_text_to_image
         ),
         ToolModelResponse(
             tool_type="vision",
             display_name="视觉模型",
-            fast_model=settings.model_vision_ocr,
-            expert_model=settings.model_vision_general
-        )
+            model=settings.model_vision
+        ),
+        ToolModelResponse(
+            tool_type="image_edit",
+            display_name="图像编辑",
+            model=settings.model_image_edit
+        ),
+        ToolModelResponse(
+            tool_type="embedding",
+            display_name="嵌入模型",
+            model=settings.model_embedding
+        ),
+        ToolModelResponse(
+            tool_type="ocr",
+            display_name="OCR识别",
+            model=settings.model_vision_ocr
+        ),
     ]
     return tool_models

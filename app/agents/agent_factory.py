@@ -311,7 +311,7 @@ class AgentFactory:
 
         return [
             PatchToolCallsMiddleware(),
-            ToolRetryMiddleware(max_retries=3, backoff_factor=2.0),
+            # ToolRetryMiddleware(max_retries=3, backoff_factor=2.0),
             ModelFallbackMiddleware(fallback_model),
             FilesystemMiddleware(backend=cls._make_backend),
             SkillsMiddleware(backend=cls._get_skills_backend(), sources=["/skills/"]),

@@ -1,4 +1,4 @@
-"""多模态工具 - 图片理解和OCR"""
+"""多模态工具 - 图片理解和 OCR"""
 
 from langchain_core.tools import tool
 from app.llm.model_factory import ModelFactory
@@ -10,11 +10,11 @@ async def understand_image(image_url: str) -> str:
     """
     理解图片内容并描述图片中有什么。
 
-    当用户上传图片并询问图片内容、场景、物体等时使用此工具。
+    当用户上传图片并询问图片内容、场景、物体、人物、颜色等时使用此工具。
 
     Args:
-        image_url: 待处理图像的路径或URL。可以是相对路径(如 images/xxx.png)、
-                   本地绝对路径、或完整的HTTP URL。
+        image_url: 待处理图像的路径或 URL。可以是相对路径 (如 images/xxx.png)、
+                   本地绝对路径、或完整的 HTTP URL。
 
     Returns:
         图片内容的详细描述
@@ -34,11 +34,11 @@ async def ocr_document(image_url: str) -> str:
     """
     识别图片中的文字内容（OCR）。
 
-    当用户上传图片并需要提取文字时使用此工具, 必须原样完整输出，不要总结、不要省略、不要改写
+    当用户上传图片并需要提取文字时使用此工具，必须原样完整输出，不要总结、不要省略、不要改写
 
     Args:
-        image_url: 待处理图像的路径或URL。可以是相对路径(如 images/xxx.png)、
-                   本地绝对路径、或完整的HTTP URL。
+        image_url: 待处理图像的路径或 URL。可以是相对路径 (如 images/xxx.png)、
+                   本地绝对路径、或完整的 HTTP URL。
 
     Returns:
         图片中提取的文字内容

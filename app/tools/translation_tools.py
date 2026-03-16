@@ -18,23 +18,25 @@ async def translate_text(text: str, target_lang: str, source_lang: str = None) -
         source_lang: 源语言代码，可选。不传则自动检测源语言
 
     Returns:
-        翻译后的文本（JSON格式）
+        翻译后的文本（JSON 格式）
     """
-    model = ModelFactory.get_translation_model(is_plus=False)
-    
-    source_info = source_lang if source_lang else "自动检测"
+    model = ModelFactory.get_translation_model()
     
     messages = [
-        {"role": "user", "content": f"你是专业翻译助手。准确翻译文本，保持原意和语气，只输出翻译结果。将以下{source_info}文本翻译成{target_lang}：\n\n{text}"}
+        {"role": "user", "content": text}
     ]
     
-    result = await model.ainvoke(messages)
-    translated_text = result.content
+    translation_options = {
+        "source_lang": source_lang or "auto",
+        "target_lang": target_lang,
+    }
+    
+    translated_text = await model.ainvoke(messages, translation_options=translation_options)
     
     return json.dumps({
         "type": "translation",
         "source_lang": source_lang or "auto",
         "target_lang": target_lang,
         "original_text": text[:200] + "..." if len(text) > 200 else text,
-        "translated_text": translated_text
+        "translated_text": translated_text.content
     })

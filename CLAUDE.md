@@ -1,319 +1,581 @@
-# CLAUDE.md
+# CLAUDE.md - DragonAI v2 Local 开发指南
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+## 📋 项目概述
 
-## Project Overview
+DragonAI 是一个基于 LangChain 1.0+ 和 LangGraph 构建的智能 AI 助手系统，采用 FastAPI + Vue 3 全栈架构。
 
-<<<<<<< HEAD
-DragonAI is an intelligent AI assistant platform built with FastAPI and LangChain/LangGraph. It features multi-agent task dispatching, RAG knowledge base, tool calling (web search, code execution, image generation), and long-term memory storage.
+### 核心特性
+- 🤖 **多模型支持**: 通义千问系列模型 (对话/代码/翻译/图像/视觉)
+- ⚡ **流式响应**: SSE 实时流式输出 + 心跳保活
+- 🔧 **工具调用**: 代码执行/文件操作/网络搜索/图像处理/RAG/文档读取
+- 📚 **知识库**: 混合检索 (向量+BM25) + 重排序
+- 💾 **持久化**: PostgreSQL (对话/消息/Agent 状态) + Redis (缓存/限流)
+- 🔐 **安全**: JWT 认证 + 令牌黑名单 + API 限流
+- 💡 **深度思考**: 支持启用/禁用深度思考模式
+- 🧠 **长期记忆**: 基于用户偏好的跨会话记忆系统
+- 🔧 **技能系统**: 支持自定义技能文件 (SKILL.md)
 
-## Tech Stack
+## 🏗️ 技术架构
 
-- **Backend**: FastAPI + Uvicorn, SQLAlchemy 2.0 (async), PostgreSQL, Redis, ChromaDB
-- **AI Framework**: LangChain + LangGraph + DeepAgents for agent orchestration
-- **LLM**: DashScope (Tongyi Qwen series via Alibaba Cloud)
-- **Frontend**: Vue 3 + TypeScript + Vite + Pinia + Element Plus
-- **Database Migration**: Alembic
-- **Testing**: pytest with asyncio support
-- **Deployment**: Docker Compose with Nginx reverse proxy
+### 后端技术栈
+- **框架**: FastAPI 0.115+ (异步 Web 服务)
+- **AI 框架**: LangChain 1.0+ + LangGraph + deepagents
+- **数据库**: PostgreSQL 15+ + SQLAlchemy 2.0 (异步 ORM)
+- **缓存**: Redis 7+ (限流/缓存)
+- **向量库**: ChromaDB 0.5+ (RAG 检索)
+- **LLM**: 通义千问 (DashScope API)
+- **SDK**: dashscope + openai + langchain-community
+- **迁移**: Alembic (数据库版本控制)
 
-## Common Commands
+### 前端技术栈
+- **框架**: Vue 3.5+ + TypeScript 5.9+
+- **构建**: Vite 7.3+
+- **状态**: Pinia 3.0+
+- **路由**: Vue Router 5.0+
+- **UI**: Element Plus 2.13+
+- **HTTP**: Axios 1.13+
+- **Markdown**: marked 17.0+
+- **代码高亮**: highlight.js 11.11+
 
-### Development
+## 📁 目录结构
+
+```
+dragonai-v2-local/
+├── app/                          # 后端主目录
+│   ├── agents/                   # Agent 工厂和配置
+│   │   ├── agent_factory.py      # LangChain Agent 创建 (核心)
+│   │   └── error_classifier.py   # 错误分类器
+│   ├── api/                      # API 层
+│   │   ├── middleware/           # 中间件 (限流/追踪/大小限制)
+│   │   ├── v1/                   # API 路由
+│   │   │   ├── auth.py           # 认证/注册
+│   │   │   ├── chat.py           # 聊天接口 (SSE 流)
+│   │   │   ├── conversations.py  # 会话管理
+│   │   │   ├── files.py          # 文件上传
+│   │   │   ├── knowledge.py      # 知识库管理
+│   │   │   ├── tools.py          # 工具列表
+│   │   │   ├── models.py         # 模型列表
+│   │   │   └── monitoring.py     # 监控接口
+│   │   └── dependencies.py       # 依赖注入
+│   ├── cache/                    # Redis 缓存
+│   │   ├── redis.py              # Redis 客户端
+│   │   └── warmup.py             # 缓存预热
+│   ├── core/                     # 核心模块
+│   │   ├── database.py           # 数据库连接
+│   │   ├── security.py           # JWT 认证
+│   │   ├── rate_limit.py         # 限流配置
+│   │   ├── tracing.py            # 链路追踪
+│   │   ├── sandbox.py            # 沙盒配置
+│   │   └── exceptions.py         # 异常定义
+│   ├── llm/                      # LLM 模型工厂
+│   │   ├── model_factory.py      # 模型创建/管理
+│   │   ├── text_models.py        # 文本模型类
+│   │   └── image_models.py       # 图像模型类
+│   ├── models/                   # SQLAlchemy 模型
+│   │   ├── user.py               # 用户模型
+│   │   ├── conversation.py       # 会话模型
+│   │   └── message.py            # 消息模型
+│   ├── rag/                      # RAG 模块
+│   │   ├── loader.py             # 文档加载
+│   │   ├── splitter.py           # 文本分割
+│   │   ├── vector_store.py       # 向量存储
+│   │   ├── hybrid_retriever.py   # 混合检索
+│   │   └── reranker.py           # 重排序
+│   ├── schemas/                  # Pydantic 模型
+│   ├── security/                 # 安全模块
+│   ├── services/                 # 业务服务层
+│   │   ├── chat_service.py       # 聊天服务 (编排层)
+│   │   ├── conversation_service.py
+│   │   ├── user_service.py
+│   │   ├── knowledge_service.py
+│   │   ├── repositories/         # 数据访问层
+│   │   │   └── message_repository.py
+│   │   ├── formatters/           # 格式化器
+│   │   │   └── message_formatter.py
+│   │   └── stream/               # 流处理
+│   │       ├── sse_emitter.py    # SSE 发射器
+│   │       ├── sse_heartbeat.py  # SSE 心跳
+│   │       └── stream_processor.py
+│   ├── storage/                  # 存储模块
+│   │   ├── file_storage.py       # 文件存储
+│   │   └── sandbox.py            # 沙盒存储
+│   ├── tools/                    # Agent 工具
+│   │   ├── rag_tool.py           # 知识库检索
+│   │   ├── web_search_tool.py    # 网络搜索
+│   │   ├── code_tools.py         # 代码助手
+│   │   ├── image_tools.py        # 图像生成/编辑
+│   │   ├── translation_tools.py  # 翻译
+│   │   ├── multimodal_tool.py    # 多模态 (OCR/理解)
+│   │   └── filesystem_tools.py   # 文档读取 (PDF/Word)
+│   ├── utils/                    # 工具函数
+│   └── config.py                 # 配置管理
+│
+├── frontend/                     # 前端主目录
+│   ├── src/
+│   │   ├── components/           # Vue 组件
+│   │   │   ├── ChatInput.vue     # 聊天输入框
+│   │   │   ├── ChatMessageBubble.vue
+│   │   │   ├── ChatMessageList.vue
+│   │   │   ├── ConversationList.vue
+│   │   │   ├── ModelSelector.vue # 模型选择器
+│   │   │   ├── ToolCallCard.vue  # 工具调用卡片
+│   │   │   ├── ThinkingProcess.vue # 思考过程
+│   │   │   └── ThemeSwitcher.vue # 主题切换
+│   │   ├── views/                # 页面视图
+│   │   │   ├── Chat.vue          # 聊天页面
+│   │   │   ├── Coding.vue        # 代码页面
+│   │   │   ├── ImageGeneration.vue # 图像生成
+│   │   │   ├── ImageEditing.vue  # 图像编辑
+│   │   │   ├── Translation.vue   # 翻译页面
+│   │   │   ├── Login.vue         # 登录
+│   │   │   └── Register.vue      # 注册
+│   │   ├── stores/               # Pinia 状态
+│   │   │   ├── auth.ts           # 认证状态
+│   │   │   ├── chat.ts           # 聊天状态
+│   │   │   ├── conversation.ts   # 会话状态
+│   │   │   └── theme.ts          # 主题状态
+│   │   ├── router/               # 路由配置
+│   │   └── utils/                # 工具函数
+│   └── public/                   # 静态资源
+│
+├── alembic/                      # 数据库迁移
+├── tests/                        # 测试用例
+│   ├── unit/                     # 单元测试
+│   └── integration/              # 集成测试
+├── scripts/                      # 脚本文件
+└── storage/                      # 运行时存储
+    ├── skills/                   # 技能文件 (SKILL.md)
+    └── chroma_db/                # ChromaDB 持久化
+```
+
+## 🔧 开发环境配置
+
+### 后端配置 (.env)
 
 ```bash
-# Setup virtual environment
-python -m venv .venv
-source .venv/bin/activate  # Linux/Mac
-.venv\Scripts\activate     # Windows
+# 基础配置
+APP_NAME=DragonAI
+APP_ENV=development
+APP_DEBUG=true
+APP_HOST=0.0.0.0
+APP_PORT=8000
+
+# 安全配置
+SECRET_KEY=your-secret-key-here
+ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=30
+
+# 数据库配置
+DATABASE_URL=postgresql://user:password@localhost:5432/dragonai
+
+# Redis 配置
+REDIS_URL=redis://localhost:6379/0
+
+# ChromaDB 配置
+CHROMA_PERSIST_DIR=./chroma_db
+
+# LLM 配置
+QWEN_API_KEY=sk-your-api-key
+QWEN_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
+TAVILY_API_KEY=tvly-your-api-key
+
+# 模型配置
+MODEL_GENERAL_FAST=deepseek-r1-0528
+MODEL_GENERAL_EXPERT=deepseek-r1
+MODEL_VISION_OCR=qwen-vl-ocr
+MODEL_VISION=qwen3-vl-plus
+MODEL_TEXT_TO_IMAGE=wanx2.1-t2i-turbo
+MODEL_IMAGE_EDIT=qwen-image-edit
+MODEL_CODER=qwen3-coder-flash
+MODEL_TRANSLATION=qwen-mt-flash
+MODEL_EMBEDDING=text-embedding-v4
+
+# Agent 配置
+AGENT_TOOL_CALL_LIMIT=10
+AGENT_TIMEOUT=120
+
+# RAG 配置
+RAG_ENABLE_HYBRID=false
+RAG_ENABLE_RERANK=false
+
+# LangSmith 配置
+LANGSMITH_TRACING=true
+LANGSMITH_API_KEY=lsv2-your-api-key
+LANGSMITH_PROJECT=dragonai-v2
+```
+
+### 前端配置
+
+创建 `frontend/.env.local`:
+```bash
+VITE_API_BASE_URL=http://localhost:8000/api/v1
+```
+
+## 🚀 启动命令
+
+### 后端启动
+
+```bash
+# 1. 安装依赖
 pip install -r requirements.txt
 
-# Configure environment
-cp .env.example .env
-# Edit .env with required API keys (QWEN_API_KEY, TAVILY_API_KEY)
-
-# Database migrations
-alembic upgrade head          # Run all migrations
-alembic revision --autogenerate -m "description"  # Create new migration
-
-# Initialize database tables (without migrations)
+# 2. 初始化数据库
+alembic upgrade head
 python scripts/init_db.py
 
-# Start development server
+# 3. 启动服务
 python run.py
-# Or directly with uvicorn
-uvicorn app.main:create_app --reload --factory
+# 或开发模式
+uvicorn app.main:app --reload
 ```
 
-### Testing
+### 前端启动
 
 ```bash
-# Run all tests
-pytest
-
-# Run with coverage
-pytest --cov=app tests/
-
-# Run specific test file
-pytest tests/unit/test_chat_service.py -v
-
-# Run integration tests only
-pytest tests/integration/ -v
-
-# Run unit tests only
-pytest tests/unit/ -v
-```
-
-### Frontend
-=======
-DragonAI is a Chinese AI assistant platform built with FastAPI (backend) and Vue 3 + TypeScript (frontend). It integrates with Tongyi Qianwen (Qwen) models via LangChain/LangGraph and supports features like multi-turn conversations, tool calling, RAG knowledge base, and streaming responses via SSE.
-
-**Tech Stack:**
-- Backend: FastAPI, LangChain/LangGraph, SQLAlchemy (async), PostgreSQL, Redis, ChromaDB
-- Frontend: Vue 3, TypeScript, Vite, Pinia, Element Plus
-- AI: Tongyi Qianwen (Qwen) models via DashScope API
-
-## Common Commands
-
-### Backend Development
-
-```bash
-# Setup (Windows compatible)
-python -m venv .venv
-.venv\Scripts\activate  # Windows
-pip install -r requirements.txt
-
-# Run backend (use run.py for Windows compatibility)
-python run.py
-# OR directly with uvicorn
-uvicorn app.main:create_app --factory --reload
-
-# Run tests
-pytest                    # All tests
-pytest tests/unit/       # Unit tests only
-pytest tests/integration/ # Integration tests only
-pytest --cov=app tests/  # With coverage
-
-# Database migrations
-alembic upgrade head                    # Run pending migrations
-alembic revision --autogenerate -m "description"  # Create new migration
-alembic downgrade -1                    # Rollback one migration
-```
-
-### Frontend Development
->>>>>>> 74a94b8ef5d80e3ffc0533ac0ed46e39f96b2a5e
-
-```bash
+# 1. 安装依赖
 cd frontend
 npm install
-<<<<<<< HEAD
-npm run dev      # Development server
-npm run build    # Production build
+
+# 2. 启动开发服务器
+npm run dev
+
+# 3. 构建生产版本
+npm run build
 ```
 
-### Production Deployment
+### Docker 部署
 
 ```bash
-# Using deploy script
-chmod +x deploy.sh
-./deploy.sh deploy    # Full deploy (build + start)
-./deploy.sh build     # Build only
-./deploy.sh logs      # View logs
-./deploy.sh stop      # Stop services
-./deploy.sh restart   # Restart services
-./deploy.sh status    # Check container status
-
-# Manual Docker commands
+# 构建并启动
 docker-compose up -d
-docker-compose logs -f backend
+
+# 查看日志
+docker-compose logs -f
+
+# 停止服务
 docker-compose down
-=======
-npm run dev      # Development server (port 5173)
-npm run build    # Production build
-npm run preview  # Preview production build
 ```
 
-### Docker Deployment
+## 🧪 测试命令
 
 ```bash
-# Full stack deployment
-docker-compose up -d
-docker-compose logs -f backend
+# 运行所有测试
+pytest
 
-# Individual services
-docker-compose up -d postgres redis
-docker-compose up -d backend
-docker-compose up -d nginx
->>>>>>> 74a94b8ef5d80e3ffc0533ac0ed46e39f96b2a5e
+# 运行特定测试
+pytest tests/unit/test_agent_factory.py
+pytest tests/unit/test_chat_service.py
+
+# 带覆盖率报告
+pytest --cov=app tests/
 ```
 
-## Architecture Overview
+## 📝 代码规范
 
-<<<<<<< HEAD
-### Application Structure
+### Python 代码风格
+- 使用 type hints (类型注解)
+- 遵循 PEP 8 规范
+- 异步代码使用 `async/await`
+- 使用 Pydantic 进行数据验证
 
+### TypeScript 代码风格
+- 使用 TypeScript 严格模式
+- 接口使用 PascalCase
+- 变量和函数使用 camelCase
+- 组件文件使用 PascalCase 命名
+
+### 重要约定
+
+1. **Agent 实现**: 参考 LangChain 1.0+ 的 `create_agent` API
+2. **中间件模式**: 使用 LangChain middleware 扩展 Agent 功能
+3. **异步优先**: 所有 I/O 操作使用异步版本
+4. **依赖注入**: 使用 FastAPI 的依赖注入系统
+5. **错误处理**: 统一使用 DragonAIException 处理错误
+
+## 🔑 核心模块说明
+
+### Agent 系统 (app/agents/agent_factory.py)
+
+```python
+# Agent 创建示例
+from app.agents.agent_factory import AgentFactory
+
+# 初始化 (应用启动时)
+await AgentFactory.init_checkpointer()
+await AgentFactory.init_store()
+await AgentFactory.warmup()
+
+# 创建聊天 Agent
+agent = AgentFactory.create_chat_agent(
+    is_expert=False,      # 是否使用专家模型
+    enable_thinking=False # 是否启用深度思考
+)
+
+# 调用 Agent
+config, context = AgentFactory.get_agent_config(
+    conversation_id=123,
+    user_id=1
+)
+
+response = await agent.ainvoke(
+    {"messages": [{"role": "user", "content": "你好"}]},
+    config=config,
+    context=context
+)
+
+# 关闭 (应用关闭时)
+await AgentFactory.close_checkpointer()
+await AgentFactory.close_store()
 ```
-app/
-├── api/v1/           # API routers (auth, chat, conversations, files, knowledge, tools)
-├── agents/           # AgentFactory - creates DeepAgents with task dispatching
-├── cache/            # Redis client and cache warmup
-├── core/             # Database, security, rate limiting, logging config
-├── llm/              # DashScope client wrapper for Tongyi models
-├── models/           # SQLAlchemy ORM models (User, Conversation, Message)
-├── rag/              # RAG pipeline: hybrid retriever, reranker, document loader
-├── schemas/          # Pydantic request/response models
-├── services/         # Business logic layer
-├── storage/          # File storage, vector store, sandbox
-└── tools/            # Agent tools: web_search, code_tools, image_tools, rag_tool
+
+### Agent 中间件栈
+
+Agent 中间件按顺序执行:
+1. `PatchToolCallsMiddleware` - 修补工具调用
+2. `ModelFallbackMiddleware` - 模型降级
+3. `FilesystemMiddleware` - 文件系统工具 (ls/read/write/edit/glob/grep)
+4. `SkillsMiddleware` - 技能系统
+5. `SummarizationMiddleware` - 长文本摘要
+6. `ToolCallLimitMiddleware` - 工具调用次数限制
+7. `ModelCallLimitMiddleware` - 模型调用次数限制
+
+### 工具系统
+
+**内置工具** (ALL_TOOLS):
+- `search_knowledge_base` - RAG 知识库检索
+- `web_search` - Tavily 网络搜索
+- `ocr_document` - OCR 文档识别
+- `understand_image` - 图像理解
+- `generate_image` - 图像生成
+- `edit_image` - 图像编辑
+- `code_assist` - 代码助手
+- `translate_text` - 文本翻译
+- `read_pdf` - 读取 PDF 文件
+- `read_word` - 读取 Word 文件
+
+**文件系统工具** (由 FilesystemMiddleware 提供):
+- `ls` - 列出目录
+- `read_file` - 读取文件
+- `write_file` - 写入文件
+- `edit_file` - 编辑文件
+- `glob` - 文件匹配
+- `grep` - 文本搜索
+
+**模型类层次结构**:
+```
+DashScopeModel (抽象基类)
+├── DashScopeTextModel (文本模型基类)
+│   ├── DashScopeVisionModel (视觉理解模型)
+│   ├── DashScopeCoderModel (编程助手模型)
+│   └── DashScopeTranslationModel (翻译模型)
+└── DashScopeImageModel (图像模型基类)
+    ├── QwenImageGenerationModel (通义千问图像生成)
+    ├── QwenImageEditModel (通义千问图像编辑)
+    ├── WanxImageGenerationModelV2 (万相图像生成)
+    └── WanxImageEditModelV2_5 (万相图像编辑)
 ```
 
-### Key Architectural Patterns
+### 模型工厂 (app/llm/model_factory.py)
 
-**Agent System (app/agents/agent_factory.py)**
-- Uses DeepAgents library with `create_deep_agent()`
-- Main agent handles task dispatching to sub-agents
-- Sub-agents: general-purpose, researcher, coder, image-creator
-- Long-term memory via CompositeBackend routing to PostgreSQL
-- Checkpointer for conversation state (AsyncPostgresSaver)
+```python
+from app.llm.model_factory import ModelFactory
 
-**Database (app/core/database.py)**
-- Async SQLAlchemy with asyncpg driver
-- Converts `postgresql://` URLs to `postgresql+asyncpg://`
-- Pool size: 20, max overflow: 40
-- Dependency injection via `get_db()` generator
+# 获取通用模型
+model = ModelFactory.get_general_model(
+    is_expert=False,
+    enable_thinking=True,
+    streaming=True
+)
 
-**LLM Integration (app/llm/dashscope_client.py)**
-- Unified DashScope SDK client for all Tongyi models
-- Supports both Generation (text) and MultiModalConversation APIs
-- Async wrapper using `asyncio.to_thread()`
+# 获取视觉模型
+vision_model = ModelFactory.get_vision_model(is_ocr=False)
 
-**RAG Pipeline (app/rag/)**
-- Hybrid retriever: vector + BM25 with configurable alpha
-- Reranker: Cross-encoder or Cohere
-- Document processing with unstructured library
-- ChromaDB for vector storage
+# 获取图像生成模型
+image_model = ModelFactory.get_text_to_image_model()
 
-**Streaming (app/services/stream/)**
-- SSE with heartbeat for long-running agent tasks
-- StreamProcessor for chunked responses
+# 获取图像编辑模型
+edit_model = ModelFactory.get_image_edit_model()
 
-### Configuration
+# 获取编程模型
+coder_model = ModelFactory.get_coder_model()
 
-Environment variables managed in `app/config.py` via Pydantic Settings:
+# 获取翻译模型
+translation_model = ModelFactory.get_translation_model()
 
-Required:
-- `QWEN_API_KEY` - DashScope API key for LLM
-- `TAVILY_API_KEY` - Web search API key
-- `DATABASE_URL` - PostgreSQL connection string
-- `SECRET_KEY` - JWT signing key
+# 获取 Embedding 模型
+embedding = ModelFactory.get_embedding()
+```
 
-Model Configuration:
-- General: `deepseek-v3.1` (fast), `qwen-plus-2025-12-01` (expert)
-- Vision: `qwen-vl-ocr`, `qwen3-vl-plus`
-- Image: `qwen-image`, `qwen-image-plus`
-- Coder: `qwen3-coder-flash`, `qwen3-coder-plus`
-- Embedding: `text-embedding-v4`
+### SSE 流式响应
 
-### Testing Structure
+```python
+# 聊天服务生成 SSE 流
+from app.services.chat_service import chat_service
 
-- `tests/conftest.py` - Shared fixtures with SQLite in-memory for unit tests
-- `tests/unit/` - Isolated unit tests with mocked dependencies
-- `tests/integration/` - API integration tests requiring real services
+async for chunk in chat_service.generate_sse_stream(
+    db=db,
+    conversation_id=123,
+    user_id=1,
+    content="你好",
+    is_expert=True,
+    enable_thinking=False
+):
+    yield chunk
+```
 
-### Important Notes
+**SSE 事件格式**:
+- `thinking` - 思考过程内容
+- `thinking_end` - 思考结束
+- `content` - 文本消息
+- `tool_call` - 工具调用
+- `tool_result` - 工具结果
+- `error` - 错误消息
 
-- Windows requires `WindowsSelectorEventLoopPolicy` (configured in `run.py`)
-- Database URLs automatically converted to asyncpg format
-- Agent warmup runs on startup to cache model connections
-- Rate limiting uses Redis with slowapi
-- File uploads use signature verification for security
-- Storage directory used for files, skills, and sandbox
-=======
-### Backend Structure (`app/`)
+### 数据库模型
 
-**Core Components:**
-- `main.py` - FastAPI app factory with lifespan management (agent warmup, Redis, cache)
-- `config.py` - Pydantic-settings configuration with environment variable support
-- `core/database.py` - Async SQLAlchemy setup with asyncpg
+```python
+# User 模型
+class User(Base):
+    id: int (PK)
+    username: str (unique, index)
+    email: str (unique, index)
+    hashed_password: str
+    created_at: datetime
 
-**API Layer (`api/`):**
-- `v1/` - API routers: auth, chat, conversations, files, knowledge, tools, models, monitoring
-- `middleware/` - Rate limiting, request size limiting, tracing
-- `dependencies.py` - FastAPI dependencies (DB session, current user)
+# Conversation 模型
+class Conversation(Base):
+    id: int (PK)
+    user_id: int (FK, index)
+    title: str
+    created_at: datetime
+    updated_at: datetime
 
-**Agent System (`agents/`):**
-- `agent_factory.py` - LangChain agent creation with PostgreSQL checkpointer (AsyncPostgresSaver) or InMemorySaver fallback
-- Uses `deepagents` library with SkillsMiddleware for skill-based workflows
+# Message 模型
+class Message(Base):
+    id: int (PK)
+    conversation_id: int (FK, index)
+    role: str (user/assistant)
+    content: str
+    extra_data: dict (JSONB)
+    created_at: datetime
+```
 
-**LLM Integration (`llm/`):**
-- `model_factory.py` - Unified interface for Qwen models via ModelFactory
-- `qwen_models.py` - Qwen-specific implementations (dialogue, vision, code, translation, image generation)
+### 长期记忆系统
 
-**RAG System (`rag/`):**
-- `vector_store.py` - ChromaDB vector storage
-- `hybrid_retriever.py` - BM25 + vector hybrid search (optional)
-- `reranker.py` - Cross-encoder reranking (optional)
-- `loader.py` - Document loaders (PDF, DOCX, etc.)
+Agent 通过 StoreBackend 实现长期记忆，支持跨会话持久化:
 
-**Tools (`tools/`):**
-- Code execution, file operations, web search (Tavily), image processing, RAG queries
-- `ALL_TOOLS` exported for agent use
+**记忆路径**:
+- `/memories/preferences.txt` - 用户偏好记忆 (跨会话持久化)
+- `/workspace/` - 临时工作区 (会话级)
 
-**Services (`services/`):**
-- Business logic layer: chat_service, conversation_service, knowledge_service, user_service
-- `repositories/` - Data access layer
-- `stream/` - SSE streaming infrastructure (emitter, heartbeat, processor)
+**使用方式**:
+```python
+# 读取用户偏好
+content = await context.read_file("/memories/preferences.txt")
 
-**Security (`security/`):**
-- JWT authentication with token blacklist (Redis-backed)
-- File signature validation
+# 保存用户偏好
+await context.write_file("/memories/preferences.txt", content="用户偏好内容")
+```
 
-### Frontend Structure (`frontend/src/`)
+### 技能系统
 
-- `components/` - Vue components (chat, knowledge base, etc.)
-- `views/` - Page views
-- `stores/` - Pinia state management
-- `router/` - Vue Router configuration
-- Vite dev server proxies `/api` to `http://localhost:8000`
+技能文件存储在 `storage/skills/` 目录下，每个技能包含一个 SKILL.md 文件。
 
-### Database Models (`app/models/`)
+**示例结构**:
+```
+storage/skills/
+└── xhs-copywriting/
+    └── SKILL.md
+```
 
-- `user.py` - User accounts with password hashing
-- `conversation.py` - Chat sessions
-- `message.py` - Chat messages with JSON metadata
+**Agent 使用技能**:
+当用户请求匹配技能描述时，Agent 会自动调用 `read_file` 读取技能文件，并严格按照技能中的流程执行。
 
-### Key Design Patterns
+### RAG 混合检索 (app/rag/hybrid_retriever.py)
 
-1. **Agent Checkpointer:** Uses LangGraph's AsyncPostgresSaver for persistence, falls back to InMemorySaver if DB unavailable
-2. **Cache Warmup:** Agent and cache warmup run during startup lifespan
-3. **Streaming:** SSE with heartbeat keepalive for real-time chat responses
-4. **Rate Limiting:** Redis-backed with different limits per endpoint (auth: 10/min, chat: 30/min, default: 100/min)
-5. **Model Selection:** Multiple Qwen models configured for different tasks (fast vs expert modes)
+```python
+from app.rag.hybrid_retriever import HybridRetriever
 
-## Environment Configuration
+# 创建混合检索器
+retriever = HybridRetriever(
+    vector_store=vector_store,
+    alpha=0.5,  # 向量检索权重
+    use_chinese_tokenizer=True
+)
 
-Copy `.env.example` to `.env` and configure:
+# 索引文档
+retriever.index_documents(documents)
 
-**Required:**
-- `DATABASE_URL` - PostgreSQL connection
-- `SECRET_KEY` - JWT signing key
-- `QWEN_API_KEY` - DashScope API key
+# 检索
+results = await retriever.aretrieve(query="查询文本", k=4)
+```
 
-**Optional:**
-- `REDIS_URL` - Redis connection (default: localhost:6379/0)
-- `TAVILY_API_KEY` - Web search capability
-- `LANGSMITH_TRACING` - Enable LangSmith tracing
+### API 路由
 
-## Testing
+**认证相关**:
+- `POST /api/v1/auth/register` - 用户注册
+- `POST /api/v1/auth/login` - 用户登录
+- `POST /api/v1/auth/logout` - 用户登出
 
-- `pytest.ini` configured for asyncio mode
-- Unit tests in `tests/unit/`, integration in `tests/integration/`
-- Use `pytest --cov=app` for coverage reports
-- Mock external services (LLM APIs) in unit tests
+**聊天相关**:
+- `GET /api/v1/chat/conversations/{id}/history` - 获取聊天历史
+- `POST /api/v1/chat/send` - 发送消息 (SSE 流)
 
-## Windows Development Notes
+**会话管理**:
+- `GET /api/v1/conversations` - 获取会话列表
+- `POST /api/v1/conversations` - 创建会话
+- `PUT /api/v1/conversations/{id}` - 更新会话
+- `DELETE /api/v1/conversations/{id}` - 删除会话
 
-- `run.py` sets `WindowsSelectorEventLoopPolicy` for psycopg compatibility
-- Always use `python run.py` instead of direct uvicorn on Windows
-- Use PowerShell: `.venv\Scripts\Activate.ps1`
->>>>>>> 74a94b8ef5d80e3ffc0533ac0ed46e39f96b2a5e
+**知识库**:
+- `POST /api/v1/knowledge/upload` - 上传知识文档
+- `GET /api/v1/knowledge/search` - 搜索知识
+- `DELETE /api/v1/knowledge/{id}` - 删除知识
+
+**文件**:
+- `POST /api/v1/files/upload` - 上传文件
+
+**监控**:
+- `GET /api/v1/monitoring/health` - 健康检查
+- `GET /api/v1/monitoring/cache` - 缓存状态
+
+## 🐛 常见问题
+
+### Agent 初始化失败
+检查 PostgreSQL 和 Redis 连接配置，确保数据库已创建并运行。
+
+### 缓存预热失败
+检查 LangSmith 和 DashScope API Key 配置。
+
+### 前端跨域问题
+开发环境允许所有来源，生产环境需配置 CORS。
+
+### 向量检索慢
+- 启用混合检索：`RAG_ENABLE_HYBRID=true`
+- 调整向量维度或批次大小
+
+### 数据库连接问题
+确保 PostgreSQL 服务运行，检查 DATABASE_URL 配置。
+
+### SSE 流式输出中断
+检查网络代理配置，确保支持 SSE 长连接。
+
+## 🔒 安全注意事项
+
+1. **生产环境**: 必须更改 SECRET_KEY
+2. **API 限流**: 配置合理的限流策略
+3. **JWT 过期**: 设置合适的 token 过期时间
+4. **输入验证**: 所有用户输入使用 Pydantic 验证
+5. **文件上传**: 限制文件大小和类型
+6. **CORS**: 生产环境限制允许的来源
+7. **密码安全**: 使用 bcrypt 加密存储
+
+## 📚 参考文档
+
+- [LangChain 官方文档](https://python.langchain.com/)
+- [LangGraph 文档](https://langchain-ai.github.io/langgraph/)
+- [DeepAgents 文档](https://github.com/langchain-ai/deepagents)
+- [FastAPI 文档](https://fastapi.tiangolo.com/)
+- [Vue 3 文档](https://vuejs.org/)
+- [通义千问 API](https://help.aliyun.com/zh/dashscope/)
+- [LangSmith 文档](https://docs.smith.langchain.com/)

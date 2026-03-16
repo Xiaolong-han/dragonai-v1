@@ -16,12 +16,12 @@ async def generate_image(prompt: str, size: str = "1664*928", n: int = 1) -> str
     Args:
         prompt: 图像的详细描述，越详细效果越好。可以描述场景、物体、风格、光线、颜色等。
         size: 图像尺寸，可选 "1664*928"(默认), "1024*1024", "1024*768", "768*1024"
-        n: 生成图像数量，1-4之间的整数，默认1
+        n: 生成图像数量，1-4 之间的整数，默认 1
 
     Returns:
-        生成图像的URL列表（JSON格式）
+        生成图像的 URL 列表（JSON 格式）
     """
-    model = ModelFactory.get_image_model(is_turbo=True)
+    model = ModelFactory.get_text_to_image_model()
     urls = await model.agenerate(prompt=prompt, size=size, n=n)
     
     return json.dumps({
@@ -42,15 +42,15 @@ async def edit_image(image_url: str, prompt: str) -> str:
     可以执行添加元素、改变风格、调整颜色、替换背景等操作。
 
     Args:
-        image_url: 待编辑图像的路径或URL。可以是相对路径(如 images/xxx.png)、
-                   本地绝对路径、或完整的HTTP URL。
+        image_url: 待编辑图像的路径或 URL。可以是相对路径 (如 images/xxx.png)、
+                   本地绝对路径、或完整的 HTTP URL。
         prompt: 编辑指令描述，详细说明想要如何修改图像
 
     Returns:
-        编辑后图像的URL（JSON格式）
+        编辑后图像的 URL（JSON 格式）
     """
     model = ModelFactory.get_image_edit_model()
-    url = await model.aedit_image(image_url=image_url, prompt=prompt)
+    url = await model.aedit(image_url=image_url, prompt=prompt)
     
     return json.dumps({
         "type": "image_edited",
