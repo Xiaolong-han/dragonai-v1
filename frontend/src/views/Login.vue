@@ -150,12 +150,17 @@ const handleLogin = async () => {
 /* 页面基础 */
 .login-page {
   min-height: 100vh;
-  background: #0a0a0f;
+  background: var(--bg-secondary, #f7f8fa);
   position: relative;
   overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+/* 深色主题支持 */
+.login-page[data-theme="dark"] {
+  background: #0a0a0f;
 }
 
 /* 背景效果 */
@@ -169,10 +174,17 @@ const handleLogin = async () => {
   position: absolute;
   inset: 0;
   background-image:
-    linear-gradient(rgba(6, 182, 212, 0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(6, 182, 212, 0.03) 1px, transparent 1px);
+    linear-gradient(rgba(45, 125, 255, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(45, 125, 255, 0.05) 1px, transparent 1px);
   background-size: 60px 60px;
   mask-image: radial-gradient(ellipse at center, black 40%, transparent 80%);
+}
+
+/* 深色主题下的网格 */
+.login-page[data-theme="dark"] .grid-pattern {
+  background-image:
+    linear-gradient(rgba(6, 182, 212, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(6, 182, 212, 0.03) 1px, transparent 1px);
 }
 
 .glow-orb {
@@ -186,28 +198,46 @@ const handleLogin = async () => {
 .orb-1 {
   width: 400px;
   height: 400px;
-  background: #06b6d4;
+  background: #2d7dff;
   top: -100px;
   right: -100px;
   animation-delay: 0s;
+  opacity: 0.15;
 }
 
 .orb-2 {
   width: 300px;
   height: 300px;
-  background: #8b5cf6;
+  background: #5a9cff;
   bottom: -50px;
   left: -50px;
   animation-delay: -7s;
+  opacity: 0.12;
 }
 
 .orb-3 {
   width: 250px;
   height: 250px;
-  background: #f97316;
+  background: #16c784;
   top: 50%;
   left: 30%;
   animation-delay: -14s;
+  opacity: 0.1;
+}
+
+/* 深色主题下的光球 */
+.login-page[data-theme="dark"] .orb-1 {
+  background: #06b6d4;
+  opacity: 0.4;
+}
+
+.login-page[data-theme="dark"] .orb-2 {
+  background: #8b5cf6;
+  opacity: 0.4;
+}
+
+.login-page[data-theme="dark"] .orb-3 {
+  background: #f97316;
   opacity: 0.2;
 }
 
@@ -252,13 +282,22 @@ const handleLogin = async () => {
   width: 64px;
   height: 64px;
   margin: 0 auto 20px;
-  color: #06b6d4;
+  color: var(--primary-color, #2d7dff);
   animation: pulse 3s ease-in-out infinite;
 }
 
 .logo svg {
   width: 100%;
   height: 100%;
+  filter: drop-shadow(0 0 20px rgba(45, 125, 255, 0.3));
+}
+
+/* 深色主题下的Logo */
+.login-page[data-theme="dark"] .logo {
+  color: #06b6d4;
+}
+
+.login-page[data-theme="dark"] .logo svg {
   filter: drop-shadow(0 0 20px rgba(6, 182, 212, 0.5));
 }
 
@@ -270,10 +309,10 @@ const handleLogin = async () => {
 .brand-title {
   font-size: 32px;
   font-weight: 700;
-  color: #fff;
+  color: var(--text-primary, #1f2329);
   margin: 0 0 8px;
   letter-spacing: -0.5px;
-  background: linear-gradient(135deg, #fff 0%, #06b6d4 100%);
+  background: linear-gradient(135deg, var(--text-primary, #1f2329) 0%, var(--primary-color, #2d7dff) 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -281,8 +320,21 @@ const handleLogin = async () => {
 
 .brand-subtitle {
   font-size: 14px;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--text-secondary, #646a73);
   margin: 0;
+}
+
+/* 深色主题下的品牌文字 */
+.login-page[data-theme="dark"] .brand-title {
+  color: #fff;
+  background: linear-gradient(135deg, #fff 0%, #06b6d4 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.login-page[data-theme="dark"] .brand-subtitle {
+  color: rgba(255, 255, 255, 0.5);
 }
 
 /* 登录卡片 */
@@ -291,11 +343,21 @@ const handleLogin = async () => {
 }
 
 .login-card {
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--bg-primary, #ffffff);
   backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border-color, #e8e8e8);
   border-radius: 24px;
   padding: 40px;
+  box-shadow:
+    0 0 0 1px rgba(45, 125, 255, 0.08),
+    0 20px 60px rgba(0, 0, 0, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+/* 深色主题下的卡片 */
+.login-page[data-theme="dark"] .login-card {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow:
     0 0 0 1px rgba(6, 182, 212, 0.1),
     0 20px 60px rgba(0, 0, 0, 0.5),
@@ -310,14 +372,23 @@ const handleLogin = async () => {
 .card-header h2 {
   font-size: 24px;
   font-weight: 600;
-  color: #fff;
+  color: var(--text-primary, #1f2329);
   margin: 0 0 8px;
 }
 
 .card-header p {
   font-size: 14px;
-  color: rgba(255, 255, 255, 0.4);
+  color: var(--text-secondary, #646a73);
   margin: 0;
+}
+
+/* 深色主题下的卡片头部 */
+.login-page[data-theme="dark"] .card-header h2 {
+  color: #fff;
+}
+
+.login-page[data-theme="dark"] .card-header p {
+  color: rgba(255, 255, 255, 0.4);
 }
 
 /* 表单样式 */
@@ -336,7 +407,7 @@ const handleLogin = async () => {
 .form-group label {
   font-size: 13px;
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--text-secondary, #646a73);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -344,12 +415,25 @@ const handleLogin = async () => {
 
 .forgot-link {
   font-size: 12px;
-  color: #06b6d4;
+  color: var(--primary-color, #2d7dff);
   text-decoration: none;
   transition: color 0.2s;
 }
 
 .forgot-link:hover {
+  color: var(--primary-light, #5a9cff);
+}
+
+/* 深色主题下的表单标签 */
+.login-page[data-theme="dark"] .form-group label {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.login-page[data-theme="dark"] .forgot-link {
+  color: #06b6d4;
+}
+
+.login-page[data-theme="dark"] .forgot-link:hover {
   color: #22d3ee;
 }
 
@@ -364,33 +448,58 @@ const handleLogin = async () => {
   left: 16px;
   width: 18px;
   height: 18px;
-  color: rgba(255, 255, 255, 0.3);
+  color: var(--text-tertiary, #8f959e);
   transition: color 0.2s;
   pointer-events: none;
 }
 
 .input-wrapper:focus-within .input-icon {
-  color: #06b6d4;
+  color: var(--primary-color, #2d7dff);
 }
 
 .input-wrapper input {
   width: 100%;
   height: 48px;
   padding: 0 44px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--bg-secondary, #f7f8fa);
+  border: 1px solid var(--border-color, #e8e8e8);
   border-radius: 12px;
   font-size: 14px;
-  color: #fff;
+  color: var(--text-primary, #1f2329);
   transition: all 0.2s;
   outline: none;
 }
 
 .input-wrapper input::placeholder {
-  color: rgba(255, 255, 255, 0.3);
+  color: var(--text-tertiary, #8f959e);
 }
 
 .input-wrapper input:focus {
+  background: var(--bg-primary, #ffffff);
+  border-color: var(--primary-color, #2d7dff);
+  box-shadow: 0 0 0 3px rgba(45, 125, 255, 0.1);
+}
+
+/* 深色主题下的输入框 */
+.login-page[data-theme="dark"] .input-icon {
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.login-page[data-theme="dark"] .input-wrapper:focus-within .input-icon {
+  color: #06b6d4;
+}
+
+.login-page[data-theme="dark"] .input-wrapper input {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.login-page[data-theme="dark"] .input-wrapper input::placeholder {
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.login-page[data-theme="dark"] .input-wrapper input:focus {
   background: rgba(255, 255, 255, 0.05);
   border-color: rgba(6, 182, 212, 0.5);
   box-shadow: 0 0 0 3px rgba(6, 182, 212, 0.1);
@@ -403,7 +512,7 @@ const handleLogin = async () => {
   border: none;
   padding: 0;
   cursor: pointer;
-  color: rgba(255, 255, 255, 0.3);
+  color: var(--text-tertiary, #8f959e);
   transition: color 0.2s;
   display: flex;
   align-items: center;
@@ -411,6 +520,15 @@ const handleLogin = async () => {
 }
 
 .toggle-password:hover {
+  color: var(--text-secondary, #646a73);
+}
+
+/* 深色主题下的密码切换按钮 */
+.login-page[data-theme="dark"] .toggle-password {
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.login-page[data-theme="dark"] .toggle-password:hover {
   color: rgba(255, 255, 255, 0.6);
 }
 
@@ -424,7 +542,7 @@ const handleLogin = async () => {
   position: relative;
   height: 48px;
   margin-top: 8px;
-  background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%);
+  background: linear-gradient(135deg, var(--primary-color, #2d7dff) 0%, var(--primary-dark, #1a5fcc) 100%);
   border: none;
   border-radius: 12px;
   font-size: 15px;
@@ -434,12 +552,26 @@ const handleLogin = async () => {
   overflow: hidden;
   transition: all 0.3s;
   box-shadow:
-    0 4px 20px rgba(6, 182, 212, 0.3),
+    0 4px 20px rgba(45, 125, 255, 0.25),
     inset 0 1px 0 rgba(255, 255, 255, 0.2);
 }
 
 .submit-btn:hover:not(:disabled) {
   transform: translateY(-2px);
+  box-shadow:
+    0 8px 30px rgba(45, 125, 255, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+/* 深色主题下的提交按钮 */
+.login-page[data-theme="dark"] .submit-btn {
+  background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%);
+  box-shadow:
+    0 4px 20px rgba(6, 182, 212, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.login-page[data-theme="dark"] .submit-btn:hover:not(:disabled) {
   box-shadow:
     0 8px 30px rgba(6, 182, 212, 0.4),
     inset 0 1px 0 rgba(255, 255, 255, 0.2);
@@ -481,18 +613,31 @@ const handleLogin = async () => {
 
 .card-footer p {
   font-size: 14px;
-  color: rgba(255, 255, 255, 0.4);
+  color: var(--text-secondary, #646a73);
   margin: 0;
 }
 
 .register-link {
-  color: #06b6d4;
+  color: var(--primary-color, #2d7dff);
   text-decoration: none;
   font-weight: 500;
   transition: color 0.2s;
 }
 
 .register-link:hover {
+  color: var(--primary-light, #5a9cff);
+}
+
+/* 深色主题下的卡片底部 */
+.login-page[data-theme="dark"] .card-footer p {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.login-page[data-theme="dark"] .register-link {
+  color: #06b6d4;
+}
+
+.login-page[data-theme="dark"] .register-link:hover {
   color: #22d3ee;
 }
 
@@ -506,8 +651,13 @@ const handleLogin = async () => {
 
 .line {
   position: absolute;
-  background: linear-gradient(90deg, transparent, rgba(6, 182, 212, 0.1), transparent);
+  background: linear-gradient(90deg, transparent, rgba(45, 125, 255, 0.1), transparent);
   height: 1px;
+}
+
+/* 深色主题下的装饰线条 */
+.login-page[data-theme="dark"] .line {
+  background: linear-gradient(90deg, transparent, rgba(6, 182, 212, 0.1), transparent);
 }
 
 .line-1 {

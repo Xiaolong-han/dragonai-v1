@@ -37,54 +37,7 @@ const routes: RouteRecordRaw[] = [
       }
     ]
   },
-  {
-    path: '/image-generation',
-    component: () => import('../layouts/MainLayout.vue'),
-    meta: { requiresAuth: true },
-    children: [
-      {
-        path: '',
-        name: 'ImageGeneration',
-        component: () => import('../views/ImageGeneration.vue')
-      }
-    ]
-  },
-  {
-    path: '/image-editing',
-    component: () => import('../layouts/MainLayout.vue'),
-    meta: { requiresAuth: true },
-    children: [
-      {
-        path: '',
-        name: 'ImageEditing',
-        component: () => import('../views/ImageEditing.vue')
-      }
-    ]
-  },
-  {
-    path: '/coding',
-    component: () => import('../layouts/MainLayout.vue'),
-    meta: { requiresAuth: true },
-    children: [
-      {
-        path: '',
-        name: 'Coding',
-        component: () => import('../views/Coding.vue')
-      }
-    ]
-  },
-  {
-    path: '/translation',
-    component: () => import('../layouts/MainLayout.vue'),
-    meta: { requiresAuth: true },
-    children: [
-      {
-        path: '',
-        name: 'Translation',
-        component: () => import('../views/Translation.vue')
-      }
-    ]
-  }
+
 ]
 
 const router = createRouter({

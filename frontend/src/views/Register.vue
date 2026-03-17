@@ -248,12 +248,17 @@ const handleRegister = async () => {
 /* 页面基础 */
 .register-page {
   min-height: 100vh;
-  background: #0a0a0f;
+  background: var(--bg-secondary, #f7f8fa);
   position: relative;
   overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+/* 深色主题支持 */
+.register-page[data-theme="dark"] {
+  background: #0a0a0f;
 }
 
 /* 背景效果 */
@@ -267,10 +272,17 @@ const handleRegister = async () => {
   position: absolute;
   inset: 0;
   background-image:
-    linear-gradient(rgba(6, 182, 212, 0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(6, 182, 212, 0.03) 1px, transparent 1px);
+    linear-gradient(rgba(45, 125, 255, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(45, 125, 255, 0.05) 1px, transparent 1px);
   background-size: 60px 60px;
   mask-image: radial-gradient(ellipse at center, black 40%, transparent 80%);
+}
+
+/* 深色主题下的网格 */
+.register-page[data-theme="dark"] .grid-pattern {
+  background-image:
+    linear-gradient(rgba(6, 182, 212, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(6, 182, 212, 0.03) 1px, transparent 1px);
 }
 
 .glow-orb {
@@ -284,28 +296,46 @@ const handleRegister = async () => {
 .orb-1 {
   width: 400px;
   height: 400px;
-  background: #06b6d4;
+  background: #2d7dff;
   top: -100px;
   right: -100px;
   animation-delay: 0s;
+  opacity: 0.15;
 }
 
 .orb-2 {
   width: 300px;
   height: 300px;
-  background: #8b5cf6;
+  background: #5a9cff;
   bottom: -50px;
   left: -50px;
   animation-delay: -7s;
+  opacity: 0.12;
 }
 
 .orb-3 {
   width: 250px;
   height: 250px;
-  background: #f97316;
+  background: #16c784;
   top: 50%;
   left: 30%;
   animation-delay: -14s;
+  opacity: 0.1;
+}
+
+/* 深色主题下的光球 */
+.register-page[data-theme="dark"] .orb-1 {
+  background: #06b6d4;
+  opacity: 0.4;
+}
+
+.register-page[data-theme="dark"] .orb-2 {
+  background: #8b5cf6;
+  opacity: 0.4;
+}
+
+.register-page[data-theme="dark"] .orb-3 {
+  background: #f97316;
   opacity: 0.2;
 }
 
