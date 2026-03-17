@@ -3,7 +3,7 @@
 import pytest
 from unittest.mock import AsyncMock, patch, MagicMock
 
-from app.llm.model_factory import ModelFactory, AsyncToolModel
+from app.llm.model_factory import ModelFactory
 
 
 class TestModelFactoryConnectionPool:
@@ -111,7 +111,7 @@ class TestModelFactoryConnectionPool:
 
     def test_get_general_model_caches_client(self):
         """测试通用模型被缓存"""
-        with patch('app.llm.model_factory.CustomChatTongyi') as mock_chat_tongyi:
+        with patch('app.llm.model_factory.ChatTongyi') as mock_chat_tongyi:
             mock_model = MagicMock()
             mock_chat_tongyi.return_value = mock_model
 
@@ -123,7 +123,7 @@ class TestModelFactoryConnectionPool:
 
     def test_get_general_model_different_configs_different_cache(self):
         """测试不同配置创建不同模型"""
-        with patch('app.llm.model_factory.CustomChatTongyi') as mock_chat_tongyi:
+        with patch('app.llm.model_factory.ChatTongyi') as mock_chat_tongyi:
             mock_model1 = MagicMock()
             mock_model2 = MagicMock()
             mock_chat_tongyi.side_effect = [mock_model1, mock_model2]
@@ -136,7 +136,7 @@ class TestModelFactoryConnectionPool:
 
     def test_get_general_model_skip_cache(self):
         """测试跳过缓存"""
-        with patch('app.llm.model_factory.CustomChatTongyi') as mock_chat_tongyi:
+        with patch('app.llm.model_factory.ChatTongyi') as mock_chat_tongyi:
             mock_model1 = MagicMock()
             mock_model2 = MagicMock()
             mock_chat_tongyi.side_effect = [mock_model1, mock_model2]
@@ -149,7 +149,7 @@ class TestModelFactoryConnectionPool:
 
     def test_get_general_model_with_retry_config(self):
         """测试通用模型重试配置"""
-        with patch('app.llm.model_factory.CustomChatTongyi') as mock_chat_tongyi:
+        with patch('app.llm.model_factory.ChatTongyi') as mock_chat_tongyi:
             mock_model = MagicMock()
             mock_chat_tongyi.return_value = mock_model
 
@@ -192,8 +192,8 @@ class TestModelFactoryConnectionPool:
         assert "test3" in stats["async_clients"]
 
 
-class TestAsyncToolModelConnectionPool:
-    """AsyncToolModel 连接池测试"""
+class TestAsyncClientConnectionPool:
+    """AsyncOpenAI 客户端连接池测试"""
 
     @pytest.mark.asyncio
     async def test_uses_shared_connection_pool(self):
@@ -201,32 +201,35 @@ class TestAsyncToolModelConnectionPool:
         with patch('app.llm.model_factory.AsyncOpenAI') as mock_async_openai:
             mock_client = MagicMock()
             mock_client.close = AsyncMock()
-            mock_client.chat.completions.create = AsyncMock(
-                return_value=MagicMock(choices=[MagicMock(message=MagicMock(content="test"))])
-            )
             mock_async_openai.return_value = mock_client
 
-            model1 = AsyncToolModel(model_name="model1", api_key="test_key_123")
-            model2 = AsyncToolModel(model_name="model2", api_key="test_key_123")
+            # 使用相同的 api_key 和 base_url 应该返回相同的客户端
+            client1 = await ModelFactory.get_async_client(
+                api_key="test_key_123",
+                base_url="https://api.test.com"
+            )
+            client2 = await ModelFactory.get_async_client(
+                api_key="test_key_123",
+                base_url="https://api.test.com"
+            )
 
-            await model1.ainvoke([{"role": "user", "content": "test"}])
-            await model2.ainvoke([{"role": "user", "content": "test"}])
-
+            assert client1 is client2
             assert mock_async_openai.call_count == 1
 
     @pytest.mark.asyncio
-    async def test_ainvoke_with_retry_config(self):
-        """测试 ainvoke 使用重试配置"""
+    async def test_async_client_with_retry_config(self):
+        """测试异步客户端使用重试配置"""
         with patch('app.llm.model_factory.AsyncOpenAI') as mock_async_openai:
             mock_client = MagicMock()
             mock_client.close = AsyncMock()
-            mock_client.chat.completions.create = AsyncMock(
-                return_value=MagicMock(choices=[MagicMock(message=MagicMock(content="test"))])
-            )
             mock_async_openai.return_value = mock_client
 
-            model = AsyncToolModel(model_name="test-model")
-            await model.ainvoke([{"role": "user", "content": "test"}])
+            await ModelFactory.get_async_client(
+                api_key="test_key",
+                base_url="https://api.test.com",
+                timeout=60.0,
+                max_retries=3
+            )
 
             call_kwargs = mock_async_openai.call_args[1]
             assert call_kwargs["timeout"] == 60.0

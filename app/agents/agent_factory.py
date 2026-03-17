@@ -80,6 +80,8 @@ class AgentFactory:
     _initialized: bool = False
     _agent_cache: Dict[str, Any] = {}
     _skills_backend: Optional[FilesystemBackend] = None
+    _store: Optional[BaseStore] = None
+    _store_context: Optional[object] = None
 
     @classmethod
     async def init_checkpointer(cls) -> bool:
@@ -311,7 +313,7 @@ class AgentFactory:
 
         return [
             PatchToolCallsMiddleware(),
-            # ToolRetryMiddleware(max_retries=3, backoff_factor=2.0),
+            ToolRetryMiddleware(max_retries=1, backoff_factor=2.0),
             ModelFallbackMiddleware(fallback_model),
             FilesystemMiddleware(backend=cls._make_backend),
             SkillsMiddleware(backend=cls._get_skills_backend(), sources=["/skills/"]),

@@ -9,7 +9,6 @@ from sqlalchemy.pool import StaticPool
 
 from app.main import create_app
 from app.core.database import Base, get_db
-from app.core.redis import redis_client
 
 
 SQLALCHEMY_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
@@ -41,11 +40,12 @@ async def override_get_db():
 
 @pytest.fixture
 def mock_redis():
+    """Mock Redis client for all modules that use redis"""
     mock_redis_client = AsyncMock()
     mock_redis_client.get = AsyncMock(return_value=None)
     mock_redis_client.set = AsyncMock(return_value=None)
     mock_redis_client.delete = AsyncMock(return_value=None)
-    mock_redis_client.exists = AsyncMock(return_value=False)
+    mock_redis_client.exists = AsyncMock(return_value=0)  # Redis exists returns 0 or 1
     mock_redis_client.client = AsyncMock()
     mock_redis_client.client.scan = AsyncMock(return_value=(0, []))
     mock_redis_client.client.delete = AsyncMock(return_value=None)
@@ -53,10 +53,11 @@ def mock_redis():
     mock_redis_client.connect = AsyncMock()
     mock_redis_client.disconnect = AsyncMock()
     
-    with patch('app.core.redis.redis_client', mock_redis_client), \
+    # Patch all modules that import redis_client
+    with patch('app.cache.redis.redis_client', mock_redis_client), \
+         patch('app.security.token_blacklist.redis_client', mock_redis_client), \
          patch('app.services.conversation_service.redis_client', mock_redis_client), \
-         patch('app.services.repositories.message_repository.redis_client', mock_redis_client), \
-         patch('app.core.token_blacklist.redis_client', mock_redis_client):
+         patch('app.services.repositories.message_repository.redis_client', mock_redis_client):
         yield mock_redis_client
 
 
