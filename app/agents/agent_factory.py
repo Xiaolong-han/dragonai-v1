@@ -210,19 +210,23 @@ class AgentFactory:
             )
         )
         
-        skills_backend = cls._get_skills_backend()
+        skills_dir = str((Path(settings.storage_dir).resolve() / "skills"))
+        skills_file_backend = FilesystemBackend(
+            root_dir=skills_dir,
+            virtual_mode=True,
+        )
         
         return CompositeBackend(
             default=StateBackend(runtime),
             routes={
                 "/memories/": memories_backend,
-                "/skills/": skills_backend,
+                "/skills/": skills_file_backend,
             }
         )
 
     @classmethod
     def _get_skills_backend(cls) -> FilesystemBackend:
-        """获取技能文件系统后端
+        """获取技能文件系统后端 (用于 SkillsMiddleware 扫描)
         
         Returns:
             FilesystemBackend 实例
@@ -239,10 +243,10 @@ class AgentFactory:
                 logger.debug(f"[AGENT] Created skills directory: {skills_dir}")
             
             cls._skills_backend = FilesystemBackend(
-                root_dir=skills_dir,
+                root_dir=str(storage_dir),
                 virtual_mode=True,
             )
-            logger.debug(f"[AGENT] Initialized skills backend: {skills_dir}")
+            logger.debug(f"[AGENT] Initialized skills backend with root: {storage_dir}")
         return cls._skills_backend
 
     @classmethod
@@ -316,7 +320,7 @@ class AgentFactory:
             ToolRetryMiddleware(max_retries=1, backoff_factor=2.0),
             ModelFallbackMiddleware(fallback_model),
             FilesystemMiddleware(backend=cls._make_backend),
-            SkillsMiddleware(backend=cls._get_skills_backend(), sources=["/skills/"]),
+            SkillsMiddleware(backend=cls._make_backend, sources=["/skills/"]),
             SummarizationMiddleware(model=summary_model, max_tokens_before_summary=8000, messages_to_keep=6),
             ToolCallLimitMiddleware(run_limit=settings.agent_tool_call_limit, exit_behavior="end"),
             ModelCallLimitMiddleware(run_limit=50, exit_behavior="end"),
