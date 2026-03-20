@@ -8,15 +8,23 @@ from app.llm.model_factory import ModelFactory
 @tool
 async def code_assist(prompt: str, language: str = "python") -> str:
     """
-    编程工具
-    适用场景：当用户需要编写代码、解决编程问题、理解代码或优化代码时使用此工具。
- 
-    注意：你必须原样完整输出结果，不要总结、不要省略、不要改写。
+    编程助手工具，用于代码生成、调试和优化。
+
+    适用场景：
+    - 编写新代码或实现特定功能
+    - 解决编程问题或错误
+    - 代码优化和重构建议
+    - 解释代码逻辑
+
+    重要：必须原样完整输出结果，不要总结或省略。
 
     Args:
-        prompt: 编程需求描述。详细说明需要实现什么功能或解决什么问题。
-                示例："写一个快速排序算法"、"实现一个 HTTP 请求函数"
-        language: 编程语言名称。支持：python, javascript, java, c++, go, rust, typescript 等。
+        prompt: 编程需求描述。详细说明：
+                - 需要实现什么功能
+                - 遇到了什么问题
+                - 期望的输入输出
+                示例："实现一个支持并发的 HTTP 客户端"、"帮我调试这段代码..."
+        language: 编程语言，支持：python, javascript, java, c++, go, rust, typescript 等
                   默认值："python"
 
     Returns:

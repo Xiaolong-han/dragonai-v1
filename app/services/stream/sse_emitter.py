@@ -122,24 +122,39 @@ class SSEEmitter:
             if thinking_content:
                 logger.debug(f"[SSE] Sending thinking_end, total thinking: {len(thinking_content)} chars")
                 yield self.make_sse_event("thinking_end")
-            
+
             extra_data = {"model": "expert" if is_expert else "fast"}
             if thinking_content:
                 extra_data["thinking_content"] = thinking_content
             if tool_calls:
                 extra_data["tool_calls"] = tool_calls
-            
-            await self.message_repository.create_message(
-                db,
-                conversation_id=conversation_id,
-                message_create=MessageCreate(
-                    role="assistant",
-                    content=full_response,
-                    extra_data=extra_data
-                ),
-                user_id=user_id
-            )
+
+            # 使用 try/finally 确保即使保存失败也能通知客户端
+            # 但需要在 yield "data: [DONE]\n\n" 之前保存，以避免数据丢失
+            save_success = True
+            save_error = None
+            try:
+                await self.message_repository.create_message(
+                    db,
+                    conversation_id=conversation_id,
+                    message_create=MessageCreate(
+                        role="assistant",
+                        content=full_response,
+                        extra_data=extra_data
+                    ),
+                    user_id=user_id
+                )
+            except Exception as save_err:
+                save_success = False
+                save_error = save_err
+                logger.error(f"[SSE] Failed to save message to DB: {save_err}", exc_info=True)
+
             yield "data: [DONE]\n\n"
+
+            # 如果保存失败，记录错误但不影响客户端
+            if not save_success:
+                logger.warning(f"[SSE] Message not persisted to DB, conversation_id={conversation_id}, "
+                             f"response_length={len(full_response)}, error={save_error}")
         except asyncio.CancelledError:
             logger.info(f"[SSE] Request cancelled, conversation_id={conversation_id}")
             raise

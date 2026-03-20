@@ -8,13 +8,18 @@ from app.utils.image_utils import build_openai_image_content_async
 @tool
 async def understand_image(image_url: str) -> str:
     """
-    理解图片内容并描述图片中有什么。
+    理解并描述图片内容。
 
-    当用户上传图片并询问图片内容、场景、物体、人物、颜色等时使用此工具。
+    适用场景：
+    - 用户上传图片询问内容
+    - 分析图片场景、物体、人物
+    - 图片内容问答
 
     Args:
-        image_url: 待处理图像的路径或 URL。可以是相对路径 (如 images/xxx.png)、
-                   本地绝对路径、或完整的 HTTP URL。
+        image_url: 图片路径或 URL：
+                   - 相对路径：images/xxx.png
+                   - 本地绝对路径
+                   - HTTP/HTTPS URL
 
     Returns:
         图片内容的详细描述
@@ -32,16 +37,23 @@ async def understand_image(image_url: str) -> str:
 @tool
 async def ocr_document(image_url: str) -> str:
     """
-    识别图片中的文字内容（OCR）。
+    识别图片中的文字（OCR）。
 
-    当用户上传图片并需要提取文字时使用此工具，必须原样完整输出，不要总结、不要省略、不要改写
+    适用场景：
+    - 提取图片中的文字内容
+    - 文档图片转文字
+    - 截图文字识别
+
+    重要：必须原样完整输出识别结果，不要总结、不要省略。
 
     Args:
-        image_url: 待处理图像的路径或 URL。可以是相对路径 (如 images/xxx.png)、
-                   本地绝对路径、或完整的 HTTP URL。
+        image_url: 图片路径或 URL：
+                   - 相对路径：images/xxx.png
+                   - 本地绝对路径
+                   - HTTP/HTTPS URL
 
     Returns:
-        图片中提取的文字内容
+        图片中识别出的文字内容
     """
     model = ModelFactory.get_vision_model(is_ocr=True)
     

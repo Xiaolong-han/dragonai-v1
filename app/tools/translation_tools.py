@@ -10,12 +10,23 @@ async def translate_text(text: str, target_lang: str, source_lang: str = None) -
     """
     将文本翻译成目标语言。
 
-    当用户明确要求翻译、或需要将内容转换为其他语言时使用此工具。
+    适用场景：
+    - 用户明确要求翻译
+    - 需要将内容转换为其他语言
+
+    注意：一般对话中涉及外语时直接回复即可，只有明确要求翻译时才调用此工具。
 
     Args:
         text: 待翻译的文本内容
-        target_lang: 目标语言代码，如 zh(中文)、en(英语)、ja(日语)、ko(韩语)、fr(法语)、de(德语)、es(西班牙语)
-        source_lang: 源语言代码，可选。不传则自动检测源语言
+        target_lang: 目标语言代码：
+                     - zh: 中文
+                     - en: 英语
+                     - ja: 日语
+                     - ko: 韩语
+                     - fr: 法语
+                     - de: 德语
+                     - es: 西班牙语
+        source_lang: 源语言代码，可选。不传则自动检测
 
     Returns:
         翻译后的文本（JSON 格式）

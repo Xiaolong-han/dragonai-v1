@@ -59,7 +59,6 @@ class AgentFactory:
     _skills_backend: Optional[FilesystemBackend] = None
     _store: Optional[BaseStore] = None
     _store_context: Optional[object] = None
-    _backend_cache: Optional[CompositeBackend] = None
 
     @classmethod
     async def init_checkpointer(cls) -> bool:
@@ -102,7 +101,6 @@ class AgentFactory:
         cls._context_manager = None
         cls._agent_cache.clear()
         cls._skills_backend = None
-        cls._backend_cache = None
         logger.info("[AGENT] Cache cleared")
 
     @classmethod
@@ -204,9 +202,10 @@ class AgentFactory:
 
     @classmethod
     def _get_or_create_backend(cls, runtime) -> CompositeBackend:
-        """获取或创建复合后端 - 复用 Backend 实例
+        """获取或创建复合后端 - 每次创建新实例避免上下文混淆
 
-        使用缓存机制确保相同的 runtime 复用同一个 Backend 实例。
+        注意：不再使用类级别缓存，因为 runtime 包含用户上下文，
+        共享 backend 会导致不同用户的上下文混淆。
 
         Args:
             runtime: LangChain runtime 实例
@@ -214,9 +213,7 @@ class AgentFactory:
         Returns:
             CompositeBackend 实例
         """
-        if cls._backend_cache is None:
-            cls._backend_cache = cls._make_backend(runtime)
-        return cls._backend_cache
+        return cls._make_backend(runtime)
 
     @classmethod
     def create_chat_agent(
@@ -243,7 +240,22 @@ class AgentFactory:
         Returns:
             Agent实例，可直接调用invoke或stream
         """
-        cache_key = f"expert_{is_expert}_thinking_{enable_thinking}"
+        # 缓存键包含中间件配置，确保配置变化时重新创建 Agent
+        middleware_settings = settings.agent_middleware
+        middleware_hash = hash((
+            middleware_settings.enable_todo_list,
+            middleware_settings.enable_tool_retry,
+            middleware_settings.enable_model_fallback,
+            middleware_settings.enable_filesystem,
+            middleware_settings.enable_skills,
+            middleware_settings.enable_summarization,
+            middleware_settings.enable_tool_call_limit,
+            middleware_settings.enable_model_call_limit,
+            middleware_settings.tool_retry_max_retries,
+            middleware_settings.summarization_max_tokens,
+            middleware_settings.model_call_limit,
+        ))
+        cache_key = f"expert_{is_expert}_thinking_{enable_thinking}_mw_{middleware_hash}"
 
         if cache_key in cls._agent_cache:
             logger.debug(f"[AGENT] Using cached agent: {cache_key}")

@@ -41,7 +41,11 @@ class StreamProcessor:
                     if source in ("model", "tools"):
                         formatted_list = self.formatter.format_update({source: update}, enable_thinking)
                         for formatted in formatted_list:
-                            if formatted.get("type") not in ("unknown", None):
+                            event_type = formatted.get("type")
+                            if event_type in ("unknown", None):
+                                # 记录未知事件类型，便于调试
+                                logger.warning(f"[STREAM] Unknown event type in updates: {formatted}")
+                            else:
                                 yield formatted
     
     async def process_message(
