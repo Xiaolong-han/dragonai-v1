@@ -16,11 +16,11 @@ from langchain.agents.middleware import (
     ToolRetryMiddleware,
     ModelCallLimitMiddleware,
     ModelFallbackMiddleware,
+    TodoListMiddleware,
 )
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 
-from deepagents.middleware.skills import SkillsMiddleware
 from deepagents.middleware.patch_tool_calls import PatchToolCallsMiddleware
 from deepagents.middleware.filesystem import FilesystemMiddleware
 from deepagents.backends.filesystem import FilesystemBackend
@@ -30,6 +30,15 @@ from langgraph.store.memory import InMemoryStore, BaseStore
 
 from app.config import settings
 from app.llm.model_factory import ModelFactory
+from app.agents.prompts import (
+    SYSTEM_PROMPT,
+    WRITE_TODOS_SYSTEM_PROMPT_CN,
+    WRITE_TODOS_TOOL_DESCRIPTION_CN,
+    FILESYSTEM_SYSTEM_PROMPT_CN,
+    FILESYSTEM_TOOL_DESCRIPTIONS_CN,
+    SKILLS_SYSTEM_PROMPT_CN,
+)
+from app.agents.middleware_custom import CustomSkillsMiddleware
 
 logger = logging.getLogger(__name__)
 
@@ -38,38 +47,6 @@ logger = logging.getLogger(__name__)
 class AgentContext:
     """Agent 运行时上下文 - 用于 LangChain 1.0 的 context_schema"""
     user_id: str
-
-
-SYSTEM_PROMPT = """你是一个强大的AI助手，能够帮助用户处理各种任务。
-
-你可以使用多种工具来帮助用户，工具的功能说明已内置在系统中。
-对于简单的问候或闲聊，直接回复用户的问题即可。
-
-**工具调用重要规则**：
-- 如果调用工具缺少必填参数，不要调用工具，应该先询问用户提供缺失的信息
-- 根据用户需求选择最合适的工具，避免不必要的工具调用
-
-**技能使用规则（非常重要）**：
-- 当用户请求匹配某个技能的描述时，你必须先调用 read_file 读取该技能的完整SKILL文件
-- 禁止在没有读取技能文件的情况下直接回答相关任务
-- 读取技能文件后，必须严格按照技能中的流程和模板执行任务
-
-## 记忆系统
-
-你有以下记忆存储路径：
-
-**长期记忆（跨会话持久化）**：
-- `/memories/preferences.txt` - 用户偏好记忆
-
-**临时工作区（会话级）**：
-- `/workspace/` - 临时文件和草稿
-
-## 记忆使用规则
-
-1. **用户偏好**：当用户表达偏好时，保存到 `/memories/preferences.txt`
-2. **会话开始**：读取 `/memories/preferences.txt` 作为会话上下文
-
-"""
 
 
 class AgentFactory:
@@ -262,8 +239,8 @@ class AgentFactory:
         
         使用缓存机制，相同配置的agent只创建一次，通过thread_id区分不同对话。
         
-        集成中间件: SkillsMiddleware, PatchToolCallsMiddleware, 
-        LLMToolSelectorMiddleware, ContextEditingMiddleware, 
+        集成中间件: TodoListMiddleware, SkillsMiddleware, PatchToolCallsMiddleware,
+        LLMToolSelectorMiddleware, ContextEditingMiddleware,
         SummarizationMiddleware, ToolCallLimitMiddleware,
         ModelCallLimitMiddleware, ToolRetryMiddleware, ModelFallbackMiddleware
 
@@ -312,16 +289,29 @@ class AgentFactory:
     @classmethod
     def _build_middleware(cls) -> list:
         """构建Agent中间件列表"""
-        fallback_model = ModelFactory.get_general_model(is_expert=False, enable_thinking=False)
+        fallback_model = ModelFactory.get_general_model(is_expert=False, enable_thinking=False, streaming=True)
         summary_model = ModelFactory.get_general_model(is_expert=False, enable_thinking=False, streaming=False)
 
         return [
-            PatchToolCallsMiddleware(),
+            TodoListMiddleware(
+                system_prompt=WRITE_TODOS_SYSTEM_PROMPT_CN,
+                tool_description=WRITE_TODOS_TOOL_DESCRIPTION_CN,
+            ),  # 任务规划和跟踪
+            PatchToolCallsMiddleware(),  # 工具调用修复
             ToolRetryMiddleware(max_retries=1, backoff_factor=2.0),
             ModelFallbackMiddleware(fallback_model),
-            FilesystemMiddleware(backend=cls._make_backend),
-            SkillsMiddleware(backend=cls._make_backend, sources=["/skills/"]),
-            SummarizationMiddleware(model=summary_model, max_tokens_before_summary=8000, messages_to_keep=6),
+            FilesystemMiddleware(
+                backend=cls._make_backend,
+                system_prompt=FILESYSTEM_SYSTEM_PROMPT_CN,
+                custom_tool_descriptions=FILESYSTEM_TOOL_DESCRIPTIONS_CN,
+                tool_token_limit_before_evict=8000,
+            ),
+            CustomSkillsMiddleware(
+                backend=cls._make_backend,
+                sources=["/skills/"],
+                system_prompt_template=SKILLS_SYSTEM_PROMPT_CN,
+            ),
+            SummarizationMiddleware(model=summary_model, max_tokens_before_summary=10000, messages_to_keep=6),
             ToolCallLimitMiddleware(run_limit=settings.agent_tool_call_limit, exit_behavior="end"),
             ModelCallLimitMiddleware(run_limit=50, exit_behavior="end"),
         ]
