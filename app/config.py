@@ -13,6 +13,7 @@ class AgentMiddlewareSettings(BaseSettings):
     enable_summarization: bool = True
     enable_tool_call_limit: bool = True
     enable_model_call_limit: bool = True
+    enable_memory: bool = True  # 记忆中间件
 
     tool_retry_max_retries: int = 1
     tool_retry_backoff_factor: float = 2.0
@@ -23,6 +24,11 @@ class AgentMiddlewareSettings(BaseSettings):
     summarization_messages_to_keep: int = 6
 
     model_call_limit: int = 50
+
+    # 记忆中间件配置
+    memory_max_to_load: int = 5  # 会话开始时最多加载的记忆数
+    memory_enable_extraction: bool = True  # 是否启用自动提取
+    memory_enable_semantic_search: bool = True  # 是否启用语义检索
 
     model_config = SettingsConfigDict(
         env_file=".env",

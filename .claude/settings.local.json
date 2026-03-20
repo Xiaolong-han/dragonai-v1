@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dir \"F:\\\\code\\\\dragonai-v2-local\\\\storage\")",
+      "Bash(dir /s \"F:\\\\code\\\\dragonai-v2-local\\\\storage\\\\skills\")",
+      "Bash(python -m py_compile app/agents/agent_factory.py app/services/stream/sse_emitter.py app/services/stream/stream_processor.py)",
+      "Bash(python -m py_compile app/agents/prompts.py app/agents/error_classifier.py)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "mcp__docs-langchain__search_docs_by_lang_chain",
+      "WebSearch",
+      "Bash(python:*)"
+    ]
+  }
+}

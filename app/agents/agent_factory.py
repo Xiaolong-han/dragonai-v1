@@ -39,6 +39,7 @@ from app.agents.prompts import (
     SKILLS_SYSTEM_PROMPT_CN,
 )
 from app.agents.middleware_custom import CustomSkillsMiddleware
+from app.agents.memory_middleware import MemoryMiddleware
 
 logger = logging.getLogger(__name__)
 
@@ -117,10 +118,33 @@ class AgentFactory:
         return cls._checkpointer
 
     @classmethod
+    def _get_store_index_config(cls):
+        """获取 Store 向量索引配置
+
+        Returns:
+            IndexConfig 用于启用向量检索
+        """
+        from langgraph.store.base import IndexConfig
+
+        # 使用项目配置的 Embedding 模型
+        embedding = ModelFactory.get_embedding()
+
+        # text-embedding-v4 维度为 1024
+        # 参考: https://help.aliyun.com/zh/model-studio/getting-started/models
+        embedding_dims = 1024
+
+        return IndexConfig(
+            embed=embedding,
+            dims=embedding_dims,
+            fields=["content", "$"],  # 嵌入 content 字段和整个文档
+        )
+
+    @classmethod
     async def init_store(cls) -> bool:
         """初始化长期记忆存储 (BaseStore)
 
         用于 StoreBackend 持久化跨线程记忆。
+        启用向量检索支持语义相似度搜索。
 
         Returns:
             bool: 是否成功使用 PostgreSQL
@@ -128,16 +152,24 @@ class AgentFactory:
         try:
             if settings.database_url:
                 from langgraph.store.postgres import PostgresStore
-                cls._store_context = PostgresStore.from_conn_string(settings.database_url)
+
+                index_config = cls._get_store_index_config()
+                cls._store_context = PostgresStore.from_conn_string(
+                    settings.database_url,
+                    index=index_config,
+                )
                 cls._store = cls._store_context.__enter__()
                 cls._store.setup()
-                logger.info("[AGENT] PostgresStore initialized for long-term memory")
+                logger.info("[AGENT] PostgresStore initialized with vector search enabled")
                 return True
         except Exception as e:
             logger.warning(f"[AGENT] PostgresStore init failed, fallback to InMemoryStore: {e}")
 
-        cls._store = InMemoryStore()
+        # InMemoryStore 也支持向量检索
+        index_config = cls._get_store_index_config()
+        cls._store = InMemoryStore(index=index_config)
         cls._store_context = None
+        logger.info("[AGENT] InMemoryStore initialized with vector search enabled")
         return False
 
     @classmethod
@@ -251,9 +283,13 @@ class AgentFactory:
             middleware_settings.enable_summarization,
             middleware_settings.enable_tool_call_limit,
             middleware_settings.enable_model_call_limit,
+            middleware_settings.enable_memory,
             middleware_settings.tool_retry_max_retries,
             middleware_settings.summarization_max_tokens,
             middleware_settings.model_call_limit,
+            middleware_settings.memory_max_to_load,
+            middleware_settings.memory_enable_extraction,
+            middleware_settings.memory_enable_semantic_search,
         ))
         cache_key = f"expert_{is_expert}_thinking_{enable_thinking}_mw_{middleware_hash}"
 
@@ -294,8 +330,19 @@ class AgentFactory:
         middleware_settings = settings.agent_middleware
         fallback_model = ModelFactory.get_general_model(is_expert=False, enable_thinking=False, streaming=True)
         summary_model = ModelFactory.get_general_model(is_expert=False, enable_thinking=False, streaming=False)
+        extraction_model = ModelFactory.get_general_model(is_expert=False, enable_thinking=False, streaming=False)
 
         middleware = []
+
+        # 记忆中间件 - 放在最前面，确保其他中间件可以看到记忆上下文
+        if middleware_settings.enable_memory:
+            middleware.append(MemoryMiddleware(
+                store=cls.get_store(),
+                model=extraction_model,
+                max_memories_to_load=middleware_settings.memory_max_to_load,
+                enable_extraction=middleware_settings.memory_enable_extraction,
+                enable_semantic_search=middleware_settings.memory_enable_semantic_search,
+            ))
 
         if middleware_settings.enable_todo_list:
             middleware.append(TodoListMiddleware(
