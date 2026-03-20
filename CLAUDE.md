@@ -297,13 +297,10 @@ pytest --cov=app tests/
 ### Agent 系统 (app/agents/agent_factory.py)
 
 ```python
-# Agent 创建示例
-from app.agents.agent_factory import AgentFactory
+from app.agents.agent_factory import AgentFactory, AgentLifecycle
 
 # 初始化 (应用启动时)
-await AgentFactory.init_checkpointer()
-await AgentFactory.init_store()
-await AgentFactory.warmup()
+await AgentLifecycle.initialize()
 
 # 创建聊天 Agent
 agent = AgentFactory.create_chat_agent(
@@ -324,20 +321,30 @@ response = await agent.ainvoke(
 )
 
 # 关闭 (应用关闭时)
-await AgentFactory.close_checkpointer()
-await AgentFactory.close_store()
+await AgentLifecycle.shutdown()
 ```
 
 ### Agent 中间件栈
 
-Agent 中间件按顺序执行:
-1. `PatchToolCallsMiddleware` - 修补工具调用
-2. `ModelFallbackMiddleware` - 模型降级
-3. `FilesystemMiddleware` - 文件系统工具 (ls/read/write/edit/glob/grep)
-4. `SkillsMiddleware` - 技能系统
-5. `SummarizationMiddleware` - 长文本摘要
-6. `ToolCallLimitMiddleware` - 工具调用次数限制
-7. `ModelCallLimitMiddleware` - 模型调用次数限制
+Agent 中间件按顺序执行（可通过 `AgentMiddlewareSettings` 配置启用/禁用）:
+1. `TodoListMiddleware` - 任务规划和跟踪 (默认启用)
+2. `PatchToolCallsMiddleware` - 修补工具调用 (始终启用)
+3. `ToolRetryMiddleware` - 工具调用重试 (默认启用)
+4. `ModelFallbackMiddleware` - 模型降级 (默认启用)
+5. `FilesystemMiddleware` - 文件系统工具 (ls/read/write/edit/glob/grep) (默认启用)
+6. `SkillsMiddleware` - 技能系统 (默认启用)
+7. `SummarizationMiddleware` - 长文本摘要 (默认启用)
+8. `ToolCallLimitMiddleware` - 工具调用次数限制 (默认启用)
+9. `ModelCallLimitMiddleware` - 模型调用次数限制 (默认启用)
+
+**中间件配置** (`AgentMiddlewareSettings`):
+- `enable_*` 开关控制启用/禁用
+- `tool_retry_max_retries` / `tool_retry_backoff_factor` - 重试参数
+- `filesystem_tool_token_limit` - 文件系统 token 限制
+- `summarization_max_tokens` / `summarization_messages_to_keep` - 摘要参数
+- `model_call_limit` - 模型调用限制
+
+环境变量前缀: `AGENT_MIDDLEWARE_` (如 `AGENT_MIDDLEWARE_ENABLE_SUMMARIZATION=false`)
 
 ### 工具系统
 

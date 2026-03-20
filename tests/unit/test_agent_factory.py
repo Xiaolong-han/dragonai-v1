@@ -3,7 +3,7 @@
 import pytest
 from unittest.mock import patch, MagicMock, AsyncMock
 
-from app.agents.agent_factory import AgentFactory
+from app.agents.agent_factory import AgentFactory, AgentLifecycle
 
 
 class TestAgentFactoryWarmup:
@@ -163,6 +163,81 @@ class TestAgentFactoryConfig:
     def test_get_agent_config_with_user_id(self):
         """测试带用户 ID 的配置"""
         config, context = AgentFactory.get_agent_config("123", user_id=42)
-        
+
         assert context is not None
         assert context.user_id == "42"
+
+
+class TestAgentLifecycle:
+    """AgentLifecycle 生命周期管理测试"""
+
+    def setup_method(self):
+        """每个测试前清理 AgentFactory 状态"""
+        AgentFactory._agent_cache.clear()
+        AgentFactory._checkpointer = None
+        AgentFactory._store = None
+
+    @pytest.mark.asyncio
+    async def test_initialize_calls_all_initializers(self):
+        """测试 initialize 调用所有初始化方法"""
+        with patch.object(AgentFactory, 'init_checkpointer', new_callable=AsyncMock) as mock_init_cp, \
+             patch.object(AgentFactory, 'init_store', new_callable=AsyncMock) as mock_init_store, \
+             patch.object(AgentFactory, 'warmup', new_callable=AsyncMock) as mock_warmup:
+
+            mock_init_cp.return_value = True
+            mock_init_store.return_value = True
+
+            await AgentLifecycle.initialize()
+
+            mock_init_cp.assert_called_once()
+            mock_init_store.assert_called_once()
+            mock_warmup.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_initialize_continues_on_warmup_failure(self):
+        """测试 initialize 在 warmup 失败时继续"""
+        with patch.object(AgentFactory, 'init_checkpointer', new_callable=AsyncMock) as mock_init_cp, \
+             patch.object(AgentFactory, 'init_store', new_callable=AsyncMock) as mock_init_store, \
+             patch.object(AgentFactory, 'warmup', new_callable=AsyncMock) as mock_warmup:
+
+            mock_init_cp.return_value = True
+            mock_init_store.return_value = True
+            mock_warmup.side_effect = Exception("Warmup failed")
+
+            await AgentLifecycle.initialize()
+
+            mock_init_cp.assert_called_once()
+            mock_init_store.assert_called_once()
+            mock_warmup.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_shutdown_calls_all_closers(self):
+        """测试 shutdown 调用所有关闭方法"""
+        with patch.object(AgentFactory, 'close_checkpointer', new_callable=AsyncMock) as mock_close_cp, \
+             patch.object(AgentFactory, 'close_store', new_callable=AsyncMock) as mock_close_store:
+
+            await AgentLifecycle.shutdown()
+
+            mock_close_cp.assert_called_once()
+            mock_close_store.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_initialize_shutdown_sequence(self):
+        """测试完整的初始化-关闭序列"""
+        with patch.object(AgentFactory, 'init_checkpointer', new_callable=AsyncMock) as mock_init_cp, \
+             patch.object(AgentFactory, 'init_store', new_callable=AsyncMock) as mock_init_store, \
+             patch.object(AgentFactory, 'warmup', new_callable=AsyncMock) as mock_warmup, \
+             patch.object(AgentFactory, 'close_checkpointer', new_callable=AsyncMock) as mock_close_cp, \
+             patch.object(AgentFactory, 'close_store', new_callable=AsyncMock) as mock_close_store:
+
+            mock_init_cp.return_value = True
+            mock_init_store.return_value = True
+
+            await AgentLifecycle.initialize()
+            await AgentLifecycle.shutdown()
+
+            mock_init_cp.assert_called_once()
+            mock_init_store.assert_called_once()
+            mock_warmup.assert_called_once()
+            mock_close_cp.assert_called_once()
+            mock_close_store.assert_called_once()

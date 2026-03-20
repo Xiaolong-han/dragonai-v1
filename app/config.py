@@ -1,5 +1,35 @@
 from functools import lru_cache
+from typing import Optional
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class AgentMiddlewareSettings(BaseSettings):
+    enable_todo_list: bool = True
+    enable_tool_retry: bool = True
+    enable_model_fallback: bool = True
+    enable_filesystem: bool = True
+    enable_skills: bool = True
+    enable_summarization: bool = True
+    enable_tool_call_limit: bool = True
+    enable_model_call_limit: bool = True
+
+    tool_retry_max_retries: int = 1
+    tool_retry_backoff_factor: float = 2.0
+
+    filesystem_tool_token_limit: int = 8000
+
+    summarization_max_tokens: int = 10000
+    summarization_messages_to_keep: int = 6
+
+    model_call_limit: int = 50
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        case_sensitive=False,
+        extra="ignore",
+        env_prefix="agent_middleware_"
+    )
 
 
 class Settings(BaseSettings):
@@ -37,7 +67,7 @@ class Settings(BaseSettings):
     model_vision: str = "qwen3-vl-plus"
     """
     文本到图像模型:qwen-image, qwen-image-plus, qwen-image-max, qwen-image-2.0,qwen-image-2.0-pro
-                wan2.5-t2i-preview,wan2.2-t2i-flash,wan2.2-t2i-plus,wanx2.1-t2i-turbo, 
+                wan2.5-t2i-preview,wan2.2-t2i-flash,wan2.2-t2i-plus,wanx2.1-t2i-turbo,
                 wanx2.1-t2i-plus,z-image-turbo
     """
     model_text_to_image: str = "wanx2.1-t2i-turbo"
@@ -57,6 +87,10 @@ class Settings(BaseSettings):
     agent_tool_call_limit: int = 10
     agent_timeout: int = 120
 
+    agent_middleware: AgentMiddlewareSettings = Field(
+        default_factory=AgentMiddlewareSettings
+    )
+
     rate_limit_storage: str = "redis"
     rate_limit_default: str = "100/minute"
     rate_limit_chat: str = "30/minute"
@@ -71,8 +105,6 @@ class Settings(BaseSettings):
 
     rag_rerank_provider: str = "cross-encoder"
     rag_rerank_model: str = "BAAI/bge-reranker-base"
-
-    # cohere_api_key: str = "your-cohere-api-key-here"
 
     model_config = SettingsConfigDict(
         env_file=".env",

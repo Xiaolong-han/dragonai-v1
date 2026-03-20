@@ -59,6 +59,7 @@ class AgentFactory:
     _skills_backend: Optional[FilesystemBackend] = None
     _store: Optional[BaseStore] = None
     _store_context: Optional[object] = None
+    _backend_cache: Optional[CompositeBackend] = None
 
     @classmethod
     async def init_checkpointer(cls) -> bool:
@@ -101,15 +102,15 @@ class AgentFactory:
         cls._context_manager = None
         cls._agent_cache.clear()
         cls._skills_backend = None
+        cls._backend_cache = None
         logger.info("[AGENT] Cache cleared")
-
 
     @classmethod
     def get_checkpointer(cls) -> Union[AsyncPostgresSaver, InMemorySaver]:
         """获取 checkpointer 实例
-        
+
         如果尚未初始化，会自动初始化。
-        
+
         Returns:
             AsyncPostgresSaver 或 InMemorySaver 实例
         """
@@ -120,9 +121,9 @@ class AgentFactory:
     @classmethod
     async def init_store(cls) -> bool:
         """初始化长期记忆存储 (BaseStore)
-        
+
         用于 StoreBackend 持久化跨线程记忆。
-        
+
         Returns:
             bool: 是否成功使用 PostgreSQL
         """
@@ -136,7 +137,7 @@ class AgentFactory:
                 return True
         except Exception as e:
             logger.warning(f"[AGENT] PostgresStore init failed, fallback to InMemoryStore: {e}")
-        
+
         cls._store = InMemoryStore()
         cls._store_context = None
         return False
@@ -156,7 +157,7 @@ class AgentFactory:
     @classmethod
     def get_store(cls) -> BaseStore:
         """获取长期记忆存储实例
-        
+
         Returns:
             BaseStore 实例
         """
@@ -167,7 +168,7 @@ class AgentFactory:
     @classmethod
     def _make_backend(cls, runtime) -> CompositeBackend:
         """创建复合后端 - 路由持久化路径到 StoreBackend
-        
+
         路径规划：
         - /memories/     → StoreBackend (跨会话持久化)
         - /skills/       → FilesystemBackend (本地技能文件)
@@ -178,7 +179,7 @@ class AgentFactory:
             if context is not None:
                 return getattr(context, "user_id", "default")
             return "default"
-        
+
         memories_backend = StoreBackend(
             runtime,
             namespace=lambda ctx: (
@@ -186,13 +187,13 @@ class AgentFactory:
                 "memories"
             )
         )
-        
+
         skills_dir = str((Path(settings.storage_dir).resolve() / "skills"))
         skills_file_backend = FilesystemBackend(
             root_dir=skills_dir,
             virtual_mode=True,
         )
-        
+
         return CompositeBackend(
             default=StateBackend(runtime),
             routes={
@@ -202,29 +203,20 @@ class AgentFactory:
         )
 
     @classmethod
-    def _get_skills_backend(cls) -> FilesystemBackend:
-        """获取技能文件系统后端 (用于 SkillsMiddleware 扫描)
-        
+    def _get_or_create_backend(cls, runtime) -> CompositeBackend:
+        """获取或创建复合后端 - 复用 Backend 实例
+
+        使用缓存机制确保相同的 runtime 复用同一个 Backend 实例。
+
+        Args:
+            runtime: LangChain runtime 实例
+
         Returns:
-            FilesystemBackend 实例
+            CompositeBackend 实例
         """
-        if cls._skills_backend is None:
-            storage_dir = Path(settings.storage_dir).resolve()
-            if not storage_dir.exists():
-                storage_dir.mkdir(parents=True, exist_ok=True)
-                logger.debug(f"[AGENT] Created storage directory: {storage_dir}")
-            
-            skills_dir = storage_dir / "skills"
-            if not skills_dir.exists():
-                skills_dir.mkdir(parents=True, exist_ok=True)
-                logger.debug(f"[AGENT] Created skills directory: {skills_dir}")
-            
-            cls._skills_backend = FilesystemBackend(
-                root_dir=str(storage_dir),
-                virtual_mode=True,
-            )
-            logger.debug(f"[AGENT] Initialized skills backend with root: {storage_dir}")
-        return cls._skills_backend
+        if cls._backend_cache is None:
+            cls._backend_cache = cls._make_backend(runtime)
+        return cls._backend_cache
 
     @classmethod
     def create_chat_agent(
@@ -236,9 +228,9 @@ class AgentFactory:
 
         使用create_agent创建ReAct模式的Agent，无需AgentExecutor。
         内部基于LangGraph构建，支持持久化、流式输出等特性。
-        
+
         使用缓存机制，相同配置的agent只创建一次，通过thread_id区分不同对话。
-        
+
         集成中间件: TodoListMiddleware, SkillsMiddleware, PatchToolCallsMiddleware,
         LLMToolSelectorMiddleware, ContextEditingMiddleware,
         SummarizationMiddleware, ToolCallLimitMiddleware,
@@ -252,23 +244,21 @@ class AgentFactory:
             Agent实例，可直接调用invoke或stream
         """
         cache_key = f"expert_{is_expert}_thinking_{enable_thinking}"
-        
+
         if cache_key in cls._agent_cache:
             logger.debug(f"[AGENT] Using cached agent: {cache_key}")
             return cls._agent_cache[cache_key]
-        
+
         main_model = ModelFactory.get_general_model(
             is_expert=is_expert,
             enable_thinking=enable_thinking
         )
-        
+
         middleware = cls._build_middleware()
-        
-        # 获取 store，如果 BackendManager 未初始化则使用 None
+
         checkpointer = cls.get_checkpointer()
         store = cls.get_store()
 
-        # 延迟导入避免循环导入
         from app.tools import ALL_TOOLS
 
         agent = create_agent(
@@ -280,46 +270,78 @@ class AgentFactory:
             middleware=middleware,
             context_schema=AgentContext,
         )
-        
+
         cls._agent_cache[cache_key] = agent
         logger.debug(f"[AGENT] Created and cached agent: {cache_key}")
 
         return agent
-    
+
     @classmethod
     def _build_middleware(cls) -> list:
         """构建Agent中间件列表"""
+        middleware_settings = settings.agent_middleware
         fallback_model = ModelFactory.get_general_model(is_expert=False, enable_thinking=False, streaming=True)
         summary_model = ModelFactory.get_general_model(is_expert=False, enable_thinking=False, streaming=False)
 
-        return [
-            TodoListMiddleware(
+        middleware = []
+
+        if middleware_settings.enable_todo_list:
+            middleware.append(TodoListMiddleware(
                 system_prompt=WRITE_TODOS_SYSTEM_PROMPT_CN,
                 tool_description=WRITE_TODOS_TOOL_DESCRIPTION_CN,
-            ),  # 任务规划和跟踪
-            PatchToolCallsMiddleware(),  # 工具调用修复
-            ToolRetryMiddleware(max_retries=1, backoff_factor=2.0),
-            ModelFallbackMiddleware(fallback_model),
-            FilesystemMiddleware(
-                backend=cls._make_backend,
+            ))
+
+        middleware.append(PatchToolCallsMiddleware())
+
+        if middleware_settings.enable_tool_retry:
+            middleware.append(ToolRetryMiddleware(
+                max_retries=middleware_settings.tool_retry_max_retries,
+                backoff_factor=middleware_settings.tool_retry_backoff_factor,
+            ))
+
+        if middleware_settings.enable_model_fallback:
+            middleware.append(ModelFallbackMiddleware(fallback_model))
+
+        if middleware_settings.enable_filesystem:
+            middleware.append(FilesystemMiddleware(
+                backend=cls._get_or_create_backend,
                 system_prompt=FILESYSTEM_SYSTEM_PROMPT_CN,
                 custom_tool_descriptions=FILESYSTEM_TOOL_DESCRIPTIONS_CN,
-                tool_token_limit_before_evict=8000,
-            ),
-            CustomSkillsMiddleware(
-                backend=cls._make_backend,
+                tool_token_limit_before_evict=middleware_settings.filesystem_tool_token_limit,
+            ))
+
+        if middleware_settings.enable_skills:
+            middleware.append(CustomSkillsMiddleware(
+                backend=cls._get_or_create_backend,
                 sources=["/skills/"],
                 system_prompt_template=SKILLS_SYSTEM_PROMPT_CN,
-            ),
-            SummarizationMiddleware(model=summary_model, max_tokens_before_summary=10000, messages_to_keep=6),
-            ToolCallLimitMiddleware(run_limit=settings.agent_tool_call_limit, exit_behavior="end"),
-            ModelCallLimitMiddleware(run_limit=50, exit_behavior="end"),
-        ]
+            ))
+
+        if middleware_settings.enable_summarization:
+            middleware.append(SummarizationMiddleware(
+                model=summary_model,
+                max_tokens_before_summary=middleware_settings.summarization_max_tokens,
+                messages_to_keep=middleware_settings.summarization_messages_to_keep,
+            ))
+
+        if middleware_settings.enable_tool_call_limit:
+            middleware.append(ToolCallLimitMiddleware(
+                run_limit=settings.agent_tool_call_limit,
+                exit_behavior="end"
+            ))
+
+        if middleware_settings.enable_model_call_limit:
+            middleware.append(ModelCallLimitMiddleware(
+                run_limit=middleware_settings.model_call_limit,
+                exit_behavior="end"
+            ))
+
+        return middleware
 
     @classmethod
     async def warmup(cls):
         """启动预热：并发创建全部 4 种配置
-        
+
         在应用启动时调用，避免首次请求延迟。
         使用 asyncio.gather 并发创建，减少启动时间。
         """
@@ -331,7 +353,7 @@ class AgentFactory:
         ]
 
         logger.info("[AGENT] Starting concurrent warmup...")
-        
+
         async def create_agent_safe(is_expert: bool, thinking: bool) -> Optional[str]:
             """安全创建 Agent，返回缓存键或 None"""
             try:
@@ -340,18 +362,18 @@ class AgentFactory:
             except Exception as e:
                 logger.warning(f"[AGENT] Warmup failed for expert={is_expert}, thinking={thinking}: {e}")
                 return None
-        
+
         results = await asyncio.gather(
             *[create_agent_safe(is_expert, thinking) for is_expert, thinking in configs]
         )
-        
+
         successful = [r for r in results if r is not None]
         logger.info(f"[AGENT] Warmup completed, cached: {len(successful)}/{len(configs)}")
 
     @classmethod
     def get_cache_stats(cls) -> dict:
         """获取缓存状态
-        
+
         Returns:
             包含缓存信息的字典
         """
@@ -384,3 +406,64 @@ class AgentFactory:
 
         return config, context
 
+
+class AgentLifecycle:
+    """Agent 生命周期管理类 - 统一初始化和关闭流程
+
+    提供单一入口来管理 Agent 系统的完整生命周期，
+    包括 checkpointer、store 和 agent 预热的初始化，
+    以及对应的资源清理。
+
+    使用方式::
+
+        # 启动时
+        await AgentLifecycle.initialize()
+
+        # 关闭时
+        await AgentLifecycle.shutdown()
+    """
+
+    @classmethod
+    async def initialize(cls) -> None:
+        """统一初始化 Agent 系统所有资源
+
+        初始化顺序:
+        1. Checkpointer (PostgreSQL 或 InMemory)
+        2. Store (长期记忆存储)
+        3. Agent 预热 (4 种配置并发创建)
+
+        Raises:
+            Exception: 初始化失败时仅记录警告，不阻止启动
+        """
+        logger.info("[AGENT] Initializing Agent system...")
+
+        await AgentFactory.init_checkpointer()
+        logger.info("[AGENT] Checkpointer initialized")
+
+        await AgentFactory.init_store()
+        logger.info("[AGENT] Store initialized")
+
+        try:
+            await AgentFactory.warmup()
+            logger.info("[AGENT] Agent warmup completed")
+        except Exception as e:
+            logger.warning(f"[AGENT] Warmup failed, will create agents on-demand: {e}")
+
+    @classmethod
+    async def shutdown(cls) -> None:
+        """统一关闭 Agent 系统所有资源
+
+        关闭顺序:
+        1. Checkpointer 连接
+        2. Store 连接
+        3. 缓存清理
+        """
+        logger.info("[AGENT] Shutting down Agent system...")
+
+        await AgentFactory.close_checkpointer()
+        logger.info("[AGENT] Checkpointer closed")
+
+        await AgentFactory.close_store()
+        logger.info("[AGENT] Store closed")
+
+        logger.info("[AGENT] Agent system shutdown completed")
