@@ -13,12 +13,12 @@ from app.config import settings
 from app.rag import (
     DocumentLoader,
     DocumentSplitter,
-    ModelFactory,
     HybridRetriever,
     get_reranker,
     BaseReranker,
 )
-from app.storage.vector_store import vector_store_manager
+from app.rag.vector_store import vector_store_manager
+from app.llm.model_factory import ModelFactory
 
 logger = logging.getLogger(__name__)
 

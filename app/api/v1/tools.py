@@ -12,7 +12,7 @@
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from app.tools import ALL_TOOLS
+from app.agents.tools import ALL_TOOLS
 from app.api.dependencies import get_current_active_user
 from app.models.user import User
 from app.schemas.tools import ToolResponse, ToolDetailResponse

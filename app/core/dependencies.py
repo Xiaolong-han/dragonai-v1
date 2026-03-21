@@ -6,8 +6,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.core.security import decode_access_token
-from app.core.token_blacklist import TokenBlacklist
+from app.security.auth import decode_access_token
+from app.security.token_blacklist import TokenBlacklist
 from app.models.user import User
 
 security = HTTPBearer()

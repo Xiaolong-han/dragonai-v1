@@ -317,7 +317,7 @@ class AgentFactory:
         checkpointer = cls.get_checkpointer()
         store = cls.get_store()
 
-        from app.tools import ALL_TOOLS
+        from app.agents.tools import ALL_TOOLS
 
         agent = create_agent(
             model=main_model,

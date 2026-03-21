@@ -10,7 +10,13 @@
       "mcp__docs-langchain__search_docs_by_lang_chain",
       "WebSearch",
       "Bash(python:*)",
-      "Bash(pip show:*)"
+      "Bash(pip show:*)",
+      "Bash(find F:/code/dragonai-v2-local/app -type f -name \"*.py\" -exec wc -l {} +)",
+      "Bash(mv rag_tool.py rag.py)",
+      "Bash(mv web_search_tool.py web_search.py)",
+      "Bash(mv multimodal_tool.py multimodal.py)",
+      "Bash(mv image_tools.py image.py)",
+      "Bash(mv code_tools.py code.py)"
     ]
   }
 }
