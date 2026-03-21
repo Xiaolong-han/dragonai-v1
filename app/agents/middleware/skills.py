@@ -1,15 +1,10 @@
-"""自定义中间件扩展
+"""自定义技能中间件
 
-此模块包含对 DeepAgents 中间件的自定义扩展，支持更多配置选项。
+继承自 DeepAgents 的 SkillsMiddleware，添加自定义系统提示模板支持。
 """
 
 from deepagents.middleware.skills import SkillsMiddleware
 from deepagents.backends.protocol import BACKEND_TYPES
-from typing import TypeVar
-
-# 类型变量
-ContextT = TypeVar("ContextT")
-ResponseT = TypeVar("ResponseT")
 
 
 class CustomSkillsMiddleware(SkillsMiddleware):
@@ -20,7 +15,7 @@ class CustomSkillsMiddleware(SkillsMiddleware):
 
     Example:
         ```python
-        from app.agents.middleware_custom import CustomSkillsMiddleware
+        from app.agents.middleware.skills import CustomSkillsMiddleware
         from app.agents.prompts import SKILLS_SYSTEM_PROMPT_CN
 
         middleware = CustomSkillsMiddleware(

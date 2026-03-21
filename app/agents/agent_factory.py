@@ -38,8 +38,7 @@ from app.agents.prompts import (
     FILESYSTEM_TOOL_DESCRIPTIONS_CN,
     SKILLS_SYSTEM_PROMPT_CN,
 )
-from app.agents.middleware_custom import CustomSkillsMiddleware
-from app.agents.memory_middleware import MemoryMiddleware
+from app.agents.middleware import MemoryMiddleware, CustomSkillsMiddleware
 
 logger = logging.getLogger(__name__)
 
@@ -151,19 +150,30 @@ class AgentFactory:
         """
         try:
             if settings.database_url:
-                from langgraph.store.postgres import PostgresStore
+                from langgraph.store.postgres.aio import AsyncPostgresStore
+                import asyncpg
+
+                # 先确保 pgvector 扩展已安装
+                conn = await asyncpg.connect(settings.database_url)
+                try:
+                    await conn.execute("CREATE EXTENSION IF NOT EXISTS vector")
+                    logger.info("[AGENT] pgvector extension ensured")
+                except Exception as e:
+                    logger.warning(f"[AGENT] Could not create vector extension: {e}")
+                finally:
+                    await conn.close()
 
                 index_config = cls._get_store_index_config()
-                cls._store_context = PostgresStore.from_conn_string(
+                cls._store_context = AsyncPostgresStore.from_conn_string(
                     settings.database_url,
                     index=index_config,
                 )
-                cls._store = cls._store_context.__enter__()
-                cls._store.setup()
-                logger.info("[AGENT] PostgresStore initialized with vector search enabled")
+                cls._store = await cls._store_context.__aenter__()
+                await cls._store.setup()
+                logger.info("[AGENT] AsyncPostgresStore initialized with vector search enabled")
                 return True
         except Exception as e:
-            logger.warning(f"[AGENT] PostgresStore init failed, fallback to InMemoryStore: {e}")
+            logger.warning(f"[AGENT] AsyncPostgresStore init failed, fallback to InMemoryStore: {e}")
 
         # InMemoryStore 也支持向量检索
         index_config = cls._get_store_index_config()
@@ -175,12 +185,12 @@ class AgentFactory:
     @classmethod
     async def close_store(cls) -> None:
         """关闭长期记忆存储"""
-        if cls._store_context and hasattr(cls._store_context, '__exit__'):
+        if cls._store_context and hasattr(cls._store_context, '__aexit__'):
             try:
-                cls._store_context.__exit__(None, None, None)
-                logger.info("[AGENT] PostgresStore connection closed")
+                await cls._store_context.__aexit__(None, None, None)
+                logger.info("[AGENT] AsyncPostgresStore connection closed")
             except Exception as e:
-                logger.error(f"[AGENT] Failed to close PostgresStore: {e}")
+                logger.error(f"[AGENT] Failed to close AsyncPostgresStore: {e}")
         cls._store = None
         cls._store_context = None
 
@@ -342,6 +352,7 @@ class AgentFactory:
                 max_memories_to_load=middleware_settings.memory_max_to_load,
                 enable_extraction=middleware_settings.memory_enable_extraction,
                 enable_semantic_search=middleware_settings.memory_enable_semantic_search,
+                extraction_interval=middleware_settings.memory_extraction_interval,
             ))
 
         if middleware_settings.enable_todo_list:

@@ -29,6 +29,8 @@ class AgentMiddlewareSettings(BaseSettings):
     memory_max_to_load: int = 5  # 会话开始时最多加载的记忆数
     memory_enable_extraction: bool = True  # 是否启用自动提取
     memory_enable_semantic_search: bool = True  # 是否启用语义检索
+    memory_extraction_interval: int = 3  # 每 N 轮对话后提取记忆
+    # memory_trigger_keywords: list[str] = None  # 触发关键词（使用默认值）
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -66,8 +68,8 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     log_dir: str = "./logs"
 
-    model_general_fast: str = "deepseek-r1-0528"
-    model_general_expert: str = "deepseek-r1"
+    model_general_fast: str = "glm-4.7"
+    model_general_expert: str = "glm-5"
 
     model_vision_ocr: str = "qwen-vl-ocr"
     model_vision: str = "qwen3-vl-plus"
