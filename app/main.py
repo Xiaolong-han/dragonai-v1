@@ -1,26 +1,32 @@
-import asyncio
-import os
-import uuid
 import logging
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Request
+
+from fastapi import FastAPI
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from pydantic import ValidationError
 from slowapi.errors import RateLimitExceeded
 
-from app.config import settings
-from app.cache import redis_client, cache_warmup
-from app.core.exceptions import DragonAIException
-from app.core.database import close_db
-from app.api.middleware import (
-    limiter,
-    RequestTracingMiddleware,
-    RequestSizeLimitMiddleware,
+from app.agents.agent_factory import AgentLifecycle
+from app.api.exception_handlers import (
+    dragonai_exception_handler,
+    generic_exception_handler,
+    pydantic_validation_handler,
+    rate_limit_exceeded_handler,
+    validation_exception_handler,
 )
-from app.api.exception_handlers import dragonai_exception_handler, rate_limit_exceeded_handler
-from app.agents.agent_factory import AgentFactory, AgentLifecycle
+from app.api.middleware import (
+    RequestSizeLimitMiddleware,
+    RequestTracingMiddleware,
+    limiter,
+)
+from app.api.v1 import auth, chat, conversations, files, knowledge, models, monitoring, tools
+from app.cache import cache_warmup, redis_client
+from app.config import settings
+from app.core.database import close_db
+from app.core.exceptions import DragonAIException
 from app.llm.model_factory import ModelFactory
-from app.api.v1 import auth, conversations, files, knowledge, tools, models, chat, monitoring
+from app.schemas.response import ResponseBuilder
 
 
 @asynccontextmanager
@@ -56,21 +62,26 @@ def create_app():
         version="1.0.0",
         lifespan=lifespan
     )
-    
+
     app.add_middleware(RequestTracingMiddleware)
     app.add_middleware(RequestSizeLimitMiddleware)
-    
+
     app.state.limiter = limiter
+
+    # 注册异常处理器
     app.add_exception_handler(DragonAIException, dragonai_exception_handler)
+    app.add_exception_handler(RequestValidationError, validation_exception_handler)
+    app.add_exception_handler(ValidationError, pydantic_validation_handler)
     app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
-    
+    app.add_exception_handler(Exception, generic_exception_handler)
+
     allowed_origins = ["*"] if settings.app_env == "development" else [
         "http://localhost:3000",
         "http://localhost:5173",
         "http://127.0.0.1:3000",
         "http://127.0.0.1:5173",
     ]
-    
+
     app.add_middleware(
         CORSMiddleware,
         allow_origins=allowed_origins,
@@ -78,7 +89,7 @@ def create_app():
         allow_methods=["*"],
         allow_headers=["*"],
     )
-    
+
     app.include_router(auth.router, prefix="/api/v1")
     app.include_router(conversations.router, prefix="/api/v1")
     app.include_router(files.router, prefix="/api/v1")
@@ -87,15 +98,20 @@ def create_app():
     app.include_router(models.router, prefix="/api/v1")
     app.include_router(chat.router, prefix="/api/v1")
     app.include_router(monitoring.router, prefix="/api/v1")
-    
+
     @app.get("/")
     async def root():
-        return {"message": "Welcome to DragonAI API", "version": "2.0.0"}
-    
+        return ResponseBuilder.success(
+            data={"name": "DragonAI API", "version": "2.0.0"},
+            message="Welcome to DragonAI API"
+        )
+
     @app.get("/health")
     async def health_check():
-        return {"status": "healthy"}
-    
+        return ResponseBuilder.success(
+            data={"status": "healthy"}
+        )
+
     return app
 
 

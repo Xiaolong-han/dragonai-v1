@@ -1,7 +1,9 @@
 """编程工具 - 代码生成和协助"""
 
 import json
+
 from langchain_core.tools import tool
+
 from app.llm.model_factory import ModelFactory
 
 
@@ -43,7 +45,7 @@ async def code_assist(prompt: str, language: str = "python") -> str:
     ]
     try:
         result = await model.ainvoke(messages)
-        
+
         return json.dumps({
             "type": "code",
             "language": language,

@@ -1,4 +1,4 @@
-from typing import Optional
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -9,21 +9,21 @@ from app.security import get_password_hash, verify_password
 
 class UserService:
     @staticmethod
-    async def get_user(db: AsyncSession, user_id: int) -> Optional[User]:
+    async def get_user(db: AsyncSession, user_id: int) -> User | None:
         result = await db.execute(
             select(User).where(User.id == user_id)
         )
         return result.scalar_one_or_none()
 
     @staticmethod
-    async def get_user_by_username(db: AsyncSession, username: str) -> Optional[User]:
+    async def get_user_by_username(db: AsyncSession, username: str) -> User | None:
         result = await db.execute(
             select(User).where(User.username == username)
         )
         return result.scalar_one_or_none()
 
     @staticmethod
-    async def get_user_by_email(db: AsyncSession, email: str) -> Optional[User]:
+    async def get_user_by_email(db: AsyncSession, email: str) -> User | None:
         result = await db.execute(
             select(User).where(User.email == email)
         )
@@ -45,7 +45,7 @@ class UserService:
         return db_user
 
     @staticmethod
-    async def authenticate_user(db: AsyncSession, username: str, password: str) -> Optional[User]:
+    async def authenticate_user(db: AsyncSession, username: str, password: str) -> User | None:
         user = await UserService.get_user_by_username(db, username)
         if not user:
             return None
@@ -54,7 +54,7 @@ class UserService:
         return user
 
     @staticmethod
-    async def update_user(db: AsyncSession, user_id: int, user_update: UserUpdate) -> Optional[User]:
+    async def update_user(db: AsyncSession, user_id: int, user_update: UserUpdate) -> User | None:
         user = await UserService.get_user(db, user_id)
         if not user:
             return None

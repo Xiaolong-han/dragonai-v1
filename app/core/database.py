@@ -1,13 +1,13 @@
 import logging
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from typing import AsyncGenerator
-from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
+from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
 from sqlalchemy.ext.asyncio import (
-    AsyncSession,
     AsyncEngine,
-    create_async_engine,
+    AsyncSession,
     async_sessionmaker,
+    create_async_engine,
 )
 from sqlalchemy.orm import declarative_base
 from sqlalchemy.pool import NullPool
@@ -23,7 +23,7 @@ def get_async_database_url(database_url: str) -> str:
         database_url = database_url.replace("postgresql://", "postgresql+asyncpg://", 1)
     elif database_url.startswith("postgresql+psycopg2://"):
         database_url = database_url.replace("postgresql+psycopg2://", "postgresql+asyncpg://", 1)
-    
+
     parsed = urlparse(database_url)
     if parsed.query:
         params = parse_qs(parsed.query)
@@ -31,7 +31,7 @@ def get_async_database_url(database_url: str) -> str:
         for param in unsupported_params:
             if param in params:
                 del params[param]
-        
+
         new_query = urlencode(params, doseq=True)
         database_url = urlunparse((
             parsed.scheme,
@@ -41,7 +41,7 @@ def get_async_database_url(database_url: str) -> str:
             new_query,
             parsed.fragment
         ))
-    
+
     return database_url
 
 

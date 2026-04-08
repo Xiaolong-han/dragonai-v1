@@ -1,11 +1,11 @@
 from datetime import datetime
-from typing import Optional
-from pydantic import BaseModel, Field, EmailStr, ConfigDict
+
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 
 class UserBase(BaseModel):
     username: str = Field(..., min_length=3, max_length=50)
-    email: Optional[EmailStr] = None
+    email: EmailStr | None = None
 
 
 class UserCreate(UserBase):
@@ -18,8 +18,8 @@ class UserLogin(BaseModel):
 
 
 class UserUpdate(BaseModel):
-    email: Optional[EmailStr] = None
-    is_active: Optional[bool] = None
+    email: EmailStr | None = None
+    is_active: bool | None = None
 
 
 class UserResponse(UserBase):
@@ -38,4 +38,4 @@ class Token(BaseModel):
 
 
 class TokenData(BaseModel):
-    username: Optional[str] = None
+    username: str | None = None

@@ -9,40 +9,43 @@
 - 用户消息可使用前缀格式提示工具意图，如 "翻译：Hello world"
 """
 
-from typing import List
-from fastapi import APIRouter, Depends, HTTPException, status
+
+from fastapi import APIRouter, Depends
 
 from app.agents.tools import ALL_TOOLS
 from app.api.dependencies import get_current_active_user
+from app.core.exceptions import NotFoundException
 from app.models.user import User
-from app.schemas.tools import ToolResponse, ToolDetailResponse
+from app.schemas.response import ResponseBuilder
 
 router = APIRouter(prefix="/tools", tags=["工具"])
 
 
-@router.get("", response_model=List[ToolResponse])
+@router.get("")
 async def get_all_tools(current_user: User = Depends(get_current_active_user)):
     """获取所有可用工具列表"""
-    return [
+    tools = [
         {
             "name": tool.name,
             "description": tool.description or ""
         }
         for tool in ALL_TOOLS
     ]
+    return ResponseBuilder.success(data=tools)
 
 
-@router.get("/{tool_name}", response_model=ToolDetailResponse)
+@router.get("/{tool_name}")
 async def get_tool_detail(tool_name: str, current_user: User = Depends(get_current_active_user)):
     """获取工具详情"""
     for tool in ALL_TOOLS:
         if tool.name == tool_name:
-            return {
+            return ResponseBuilder.success(data={
                 "name": tool.name,
                 "description": tool.description or "",
-                "content": f"这是一个Agent工具，通过聊天调用。可在消息前添加前缀提示工具意图。"
-            }
-    raise HTTPException(
-        status_code=status.HTTP_404_NOT_FOUND,
-        detail=f"Tool '{tool_name}' not found"
+                "content": "这是一个Agent工具，通过聊天调用。可在消息前添加前缀提示工具意图。"
+            })
+    raise NotFoundException(
+        message=f"工具 '{tool_name}' 不存在",
+        resource_type="tool",
+        resource_id=tool_name
     )

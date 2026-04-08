@@ -1,6 +1,6 @@
-from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey, Text
-from sqlalchemy.sql import func
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Index, Integer, String
 from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
 
 from app.core.database import Base
 
@@ -18,3 +18,8 @@ class Conversation(Base):
 
     user = relationship("User", back_populates="conversations")
     messages = relationship("Message", back_populates="conversation", cascade="all, delete-orphan", order_by="Message.created_at")
+
+    # 复合索引：优化用户会话列表查询（按置顶和更新时间排序）
+    __table_args__ = (
+        Index('ix_conversations_user_pinned_updated', 'user_id', 'is_pinned', 'updated_at'),
+    )

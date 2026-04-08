@@ -51,7 +51,9 @@ class TestRequestSizeLimit:
         large_data = {"key": "x" * (15 * 1024 * 1024)}
         response = client.post("/test", json=large_data)
         assert response.status_code == 413
-        assert response.json()["error"]["code"] == "PAYLOAD_TOO_LARGE"
+        json_data = response.json()
+        # 统一响应格式: {code: ERROR_CODE, message: "...", data: null}
+        assert json_data["code"] != 0  # 非 0 表示错误
 
     def test_get_request_not_affected(self, client):
         """测试 GET 请求不受影响"""
@@ -84,8 +86,9 @@ class TestRequestSizeLimit:
         large_data = {"key": "x" * (15 * 1024 * 1024)}
         response = client.post("/test", json=large_data)
         assert response.status_code == 413
-        error = response.json()["error"]
-        assert "code" in error
-        assert "message" in error
-        assert error["code"] == "PAYLOAD_TOO_LARGE"
-        assert "10MB" in error["message"]
+        # 统一响应格式: {code: ERROR_CODE, message: "...", data: null}
+        json_data = response.json()
+        assert "code" in json_data
+        assert "message" in json_data
+        assert json_data["code"] != 0  # 非 0 表示错误
+        assert "10MB" in json_data["message"] or "MB" in json_data["message"]

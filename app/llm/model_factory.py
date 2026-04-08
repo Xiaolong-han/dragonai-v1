@@ -8,28 +8,27 @@
 import asyncio
 import hashlib
 import logging
-from typing import Optional, List, Dict, Any, Union
+from typing import Any
 
-from openai import AsyncOpenAI
 from langchain_community.chat_models import ChatTongyi
 from langchain_community.embeddings import DashScopeEmbeddings
+from openai import AsyncOpenAI
 
 from app.config import settings
-from app.llm.text_models import (
-    DashScopeModel,
-    DashScopeTextModel,
-    DashScopeCoderModel,
-    DashScopeTranslationModel,
-    QwenOCRModel,
-    QwenVisionModel,
-)
 from app.llm.image_models import (
     DashScopeImageModel,
-    QwenImageGenerationModel,
     QwenImageEditModel,
-    WanxImageGenerationModelV2,
+    QwenImageGenerationModel,
     WanxImageEditModelV2_5,
+    WanxImageGenerationModelV2,
 )
+from app.llm.text_models import (
+    DashScopeCoderModel,
+    DashScopeModel,
+    DashScopeTranslationModel,
+    QwenVisionModel,
+)
+from app.monitoring import get_metrics_callback_handler
 
 logger = logging.getLogger(__name__)
 
@@ -37,15 +36,15 @@ logger = logging.getLogger(__name__)
 class ModelFactory:
     """模型工厂 - 支持配置化模型创建，连接池复用"""
 
-    _chat_clients: Dict[str, ChatTongyi] = {}
-    _async_clients: Dict[str, AsyncOpenAI] = {}
+    _chat_clients: dict[str, ChatTongyi] = {}
+    _async_clients: dict[str, AsyncOpenAI] = {}
     _lock = asyncio.Lock()
 
     @classmethod
     async def get_async_client(
         cls,
-        api_key: str = None,
-        base_url: str = None,
+        api_key: str | None = None,
+        base_url: str | None = None,
         timeout: float = 60.0,
         max_retries: int = 3
     ) -> AsyncOpenAI:
@@ -118,6 +117,9 @@ class ModelFactory:
             if streaming:
                 model_kwargs["incremental_output"] = True
 
+        # 获取监控回调处理器
+        metrics_callback = get_metrics_callback_handler()
+
         client = ChatTongyi(
             model=model_name,
             dashscope_api_key=settings.qwen_api_key,
@@ -125,7 +127,8 @@ class ModelFactory:
             temperature=0.3 if enable_thinking else 0.6,
             model_kwargs=model_kwargs if model_kwargs else None,
             request_timeout=60,
-            max_retries=3
+            max_retries=3,
+            callbacks=[metrics_callback],  # 添加监控回调
         )
 
         if use_cache:
@@ -137,7 +140,7 @@ class ModelFactory:
     @classmethod
     def get_vision_model(cls, is_ocr: bool = False, **kwargs) -> DashScopeModel:
         """获取视觉模型 - 统一使用一个模型
-        
+
         Args:
             is_ocr: 是否使用 OCR 专用模型
         """
@@ -150,15 +153,15 @@ class ModelFactory:
             api_key=settings.qwen_api_key,
             **kwargs
         )
-    
+
     @classmethod
     def get_text_to_image_model(cls, **kwargs) -> DashScopeImageModel:
         """获取图像生成模型 - 统一使用一个模型
-        
+
         根据配置的模型名称自动选择 Qwen 或 Wanx 系列
         """
         model_name = settings.model_text_to_image
-        
+
         # 根据模型名称前缀选择正确的模型类
         if model_name.startswith("wan"):
             return WanxImageGenerationModelV2(
@@ -172,15 +175,15 @@ class ModelFactory:
                 api_key=settings.qwen_api_key,
                 **kwargs
             )
-    
+
     @classmethod
     def get_image_edit_model(cls, **kwargs) -> DashScopeImageModel:
         """获取图像编辑模型 - 根据配置选择模型类型
-        
+
         注意：图像编辑使用专门的模型
         """
         model_name = settings.model_image_edit
-        
+
         # 根据模型名称前缀选择正确的模型类
         if model_name.startswith("wan"):
             return WanxImageEditModelV2_5(
@@ -194,7 +197,7 @@ class ModelFactory:
                 api_key=settings.qwen_api_key,
                 **kwargs
             )
-    
+
     @classmethod
     def get_coder_model(cls, **kwargs) -> DashScopeModel:
         """获取编程模型 - 统一使用一个模型"""
@@ -203,7 +206,7 @@ class ModelFactory:
             api_key=settings.qwen_api_key,
             **kwargs
         )
-    
+
     @classmethod
     def get_translation_model(cls, **kwargs) -> DashScopeModel:
         """获取翻译模型 - 统一使用一个模型"""
@@ -214,7 +217,7 @@ class ModelFactory:
         )
 
     @classmethod
-    def get_embedding(cls, model_name: str = None, **kwargs) -> DashScopeEmbeddings:
+    def get_embedding(cls, model_name: str | None = None, **kwargs) -> DashScopeEmbeddings:
         """获取Embedding模型
 
         使用 DashScopeEmbeddings 官方集成
@@ -244,7 +247,7 @@ class ModelFactory:
         logger.info("[MODEL FACTORY] All clients closed and cache cleared")
 
     @classmethod
-    def get_cache_stats(cls) -> Dict[str, Any]:
+    def get_cache_stats(cls) -> dict[str, Any]:
         """获取缓存状态"""
         return {
             "chat_clients": list(cls._chat_clients.keys()),

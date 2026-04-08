@@ -1,8 +1,8 @@
-
-from typing import List
-from fastapi import APIRouter, UploadFile, File, HTTPException, Depends
+from fastapi import APIRouter, Depends, File, UploadFile
 from pydantic import BaseModel
 
+from app.core.exceptions import ExternalServiceException
+from app.schemas.response import ResponseBuilder
 from app.services.knowledge_service import KnowledgeService, get_knowledge_service
 
 router = APIRouter(prefix="/knowledge", tags=["知识库"])
@@ -19,7 +19,7 @@ class DocumentResponse(BaseModel):
 
 
 class SearchResult(BaseModel):
-    results: List[DocumentResponse]
+    results: list[DocumentResponse]
 
 
 class UploadResponse(BaseModel):
@@ -41,7 +41,7 @@ class StatsResponse(BaseModel):
     document_count: int
 
 
-@router.post("/upload", response_model=UploadResponse)
+@router.post("/upload")
 async def upload_document(
     file: UploadFile = File(...),
     service: KnowledgeService = Depends(get_knowledge_service),
@@ -52,19 +52,24 @@ async def upload_document(
             physical_path,
             metadata={"source": file.filename}
         )
-        
-        return UploadResponse(
-            success=True,
-            message="Document uploaded successfully",
-            chunks=result["chunks"],
-            added=result["added"],
-            updated=result["updated"],
+
+        return ResponseBuilder.success(
+            data=UploadResponse(
+                success=True,
+                message="文档上传成功",
+                chunks=result["chunks"],
+                added=result["added"],
+                updated=result["updated"],
+            ).model_dump()
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
+        raise ExternalServiceException(
+            message=f"文档上传失败: {e!s}",
+            service_name="knowledge"
+        ) from e
 
 
-@router.post("/search", response_model=SearchResult)
+@router.post("/search")
 async def search_knowledge(
     request: SearchRequest,
     service: KnowledgeService = Depends(get_knowledge_service),
@@ -75,39 +80,50 @@ async def search_knowledge(
             k=request.k,
         )
         results = [
-            DocumentResponse(content=doc.page_content, metadata=doc.metadata)
+            DocumentResponse(content=doc.page_content, metadata=doc.metadata).model_dump()
             for doc in documents
         ]
-        return SearchResult(results=results)
+        return ResponseBuilder.success(data={"results": results})
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Search failed: {str(e)}")
+        raise ExternalServiceException(
+            message=f"知识检索失败: {e!s}",
+            service_name="knowledge"
+        ) from e
 
 
-@router.get("/stats", response_model=StatsResponse)
+@router.get("/stats")
 async def get_stats(
     service: KnowledgeService = Depends(get_knowledge_service),
 ):
     try:
         stats = await service.get_collection_stats()
-        return StatsResponse(**stats)
+        return ResponseBuilder.success(data=StatsResponse(**stats).model_dump())
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to get stats: {str(e)}")
+        raise ExternalServiceException(
+            message=f"获取统计信息失败: {e!s}",
+            service_name="knowledge"
+        ) from e
 
 
-@router.delete("/{filename:path}", response_model=DeleteResponse)
+@router.delete("/{filename:path}")
 async def delete_document(
     filename: str,
     service: KnowledgeService = Depends(get_knowledge_service),
 ):
     try:
         deleted_count = await service.delete_document(filename)
-        return DeleteResponse(
-            success=True,
-            message=f"Deleted {deleted_count} document chunks",
-            deleted_count=deleted_count,
+        return ResponseBuilder.success(
+            data=DeleteResponse(
+                success=True,
+                message=f"已删除 {deleted_count} 个文档片段",
+                deleted_count=deleted_count,
+            ).model_dump()
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Delete failed: {str(e)}")
+        raise ExternalServiceException(
+            message=f"删除文档失败: {e!s}",
+            service_name="knowledge"
+        ) from e
 
 
 @router.delete("/collection")
@@ -116,6 +132,9 @@ async def delete_collection(
 ):
     try:
         await service.delete_collection()
-        return {"success": True, "message": "Knowledge base deleted"}
+        return ResponseBuilder.success(message="知识库已删除")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Delete failed: {str(e)}")
+        raise ExternalServiceException(
+            message=f"删除知识库失败: {e!s}",
+            service_name="knowledge"
+        ) from e

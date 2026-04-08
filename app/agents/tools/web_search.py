@@ -1,13 +1,15 @@
 """联网搜索工具"""
 
 import json
+
 from langchain_core.tools import tool
 from tavily import AsyncTavilyClient
+
 from app.config import settings
 
 async_tavily_client = AsyncTavilyClient(api_key=settings.tavily_api_key)
 
-    
+
 @tool
 async def web_search(query: str, max_results: int = 5) -> str:
     """
@@ -29,13 +31,13 @@ async def web_search(query: str, max_results: int = 5) -> str:
         搜索结果（JSON格式），包含标题、链接和摘要
     """
     results = await async_tavily_client.search(
-        query, 
+        query,
         search_depth="advanced",
-        include_raw_content=False, 
-        max_results=max_results, 
+        include_raw_content=False,
+        max_results=max_results,
         topic="general"
     )
-    
+
     links = []
     result_list = results.get("results", [])
     for item in result_list[:5]:
@@ -43,7 +45,7 @@ async def web_search(query: str, max_results: int = 5) -> str:
             "title": item.get("title", ""),
             "url": item.get("url", "")
         })
-    
+
     return json.dumps({
         "type": "search_results",
         "query": query,

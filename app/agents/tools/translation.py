@@ -1,12 +1,14 @@
 """翻译工具 - 文本翻译"""
 
 import json
+
 from langchain_core.tools import tool
+
 from app.llm.model_factory import ModelFactory
 
 
 @tool
-async def translate_text(text: str, target_lang: str, source_lang: str = None) -> str:
+async def translate_text(text: str, target_lang: str, source_lang: str | None = None) -> str:
     """
     将文本翻译成目标语言。
 
@@ -32,18 +34,18 @@ async def translate_text(text: str, target_lang: str, source_lang: str = None) -
         翻译后的文本（JSON 格式）
     """
     model = ModelFactory.get_translation_model()
-    
+
     messages = [
         {"role": "user", "content": text}
     ]
-    
+
     translation_options = {
         "source_lang": source_lang or "auto",
         "target_lang": target_lang,
     }
-    
+
     translated_text = await model.ainvoke(messages, translation_options=translation_options)
-    
+
     return json.dumps({
         "type": "translation",
         "source_lang": source_lang or "auto",

@@ -1,11 +1,11 @@
 from datetime import datetime
-from typing import Optional
-from pydantic import BaseModel, Field, ConfigDict
+
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ConversationBase(BaseModel):
     title: str = Field(..., max_length=200)
-    model_name: Optional[str] = None
+    model_name: str | None = None
 
 
 class ConversationCreate(ConversationBase):
@@ -13,9 +13,9 @@ class ConversationCreate(ConversationBase):
 
 
 class ConversationUpdate(BaseModel):
-    title: Optional[str] = Field(None, max_length=200)
-    is_pinned: Optional[bool] = None
-    model_name: Optional[str] = None
+    title: str | None = Field(None, max_length=200)
+    is_pinned: bool | None = None
+    model_name: str | None = None
 
 
 class ConversationResponse(ConversationBase):

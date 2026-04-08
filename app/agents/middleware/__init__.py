@@ -8,4 +8,4 @@
 from app.agents.middleware.memory import MemoryMiddleware
 from app.agents.middleware.skills import CustomSkillsMiddleware
 
-__all__ = ["MemoryMiddleware", "CustomSkillsMiddleware"]
+__all__ = ["CustomSkillsMiddleware", "MemoryMiddleware"]

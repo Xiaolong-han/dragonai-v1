@@ -1,14 +1,14 @@
 """API 依赖注入"""
 
-from typing import Optional
+
 from fastapi import Depends, HTTPException, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.security import decode_access_token, TokenBlacklist
 from app.models.user import User
+from app.security import TokenBlacklist, decode_access_token
 
 security = HTTPBearer()
 
@@ -26,21 +26,21 @@ async def get_current_user(
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
-    
+
     if await TokenBlacklist.is_blacklisted(token):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token has been revoked",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    
+
     payload = decode_access_token(token)
     if payload is None:
         raise credentials_exception
-    username: Optional[str] = payload.get("sub")
+    username: str | None = payload.get("sub")
     if username is None:
         raise credentials_exception
-    
+
     result = await db.execute(
         select(User).where(User.username == username)
     )

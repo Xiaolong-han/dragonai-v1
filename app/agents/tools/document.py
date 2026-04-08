@@ -3,7 +3,6 @@
 import asyncio
 import logging
 from pathlib import Path
-from typing import Optional
 
 from langchain_core.tools import tool
 
@@ -33,10 +32,10 @@ def _resolve_path(file_path: str, for_write: bool = False) -> Path:
             return FileSandbox.validate_path_for_write(file_path)
         return FileSandbox.validate_path(file_path)
     except PermissionError as e:
-        raise ValueError(str(e))
+        raise ValueError(str(e)) from e
 
 
-def _read_pdf_sync(file_path: Path, start_page: int, end_page: Optional[int]) -> tuple:
+def _read_pdf_sync(file_path: Path, start_page: int, end_page: int | None) -> tuple:
     """同步读取 PDF 文件，返回 (total_pages, content_parts, total_text, needs_ocr)"""
     from pypdf import PdfReader
 
@@ -66,8 +65,9 @@ def _read_pdf_sync(file_path: Path, start_page: int, end_page: Optional[int]) ->
 
 def _render_pdf_page_sync(file_path: Path, page_num: int) -> str:
     """同步渲染 PDF 页面为 base64 图片"""
-    import fitz
     import base64
+
+    import fitz
 
     doc = fitz.open(str(file_path))
     page = doc[page_num]
@@ -81,7 +81,7 @@ def _render_pdf_page_sync(file_path: Path, page_num: int) -> str:
 
 
 @tool
-async def read_pdf(file_path: str, start_page: int = 1, end_page: Optional[int] = None, use_ocr: bool = False) -> str:
+async def read_pdf(file_path: str, start_page: int = 1, end_page: int | None = None, use_ocr: bool = False) -> str:
     """读取 PDF 文件内容。
 
     当用户上传 PDF 文件并需要提取文字内容时使用此工具。
@@ -111,7 +111,7 @@ async def read_pdf(file_path: str, start_page: int = 1, end_page: Optional[int] 
         return f"错误：文件 '{file_path}' 不是 PDF 格式"
 
     try:
-        total_pages, content_parts, total_text, needs_ocr = await asyncio.to_thread(
+        total_pages, content_parts, _total_text, needs_ocr = await asyncio.to_thread(
             _read_pdf_sync, resolved, start_page, end_page
         )
 
@@ -132,13 +132,14 @@ async def read_pdf(file_path: str, start_page: int = 1, end_page: Optional[int] 
         return "\n".join(content_parts)
 
     except Exception as e:
-        return f"读取 PDF 文件时出错: {str(e)}"
+        return f"读取 PDF 文件时出错: {e!s}"
 
 
 async def _ocr_pdf(file_path: Path, start_page: int, end_page: int) -> str:
     """使用 OCR 处理扫描版 PDF"""
     try:
         import fitz
+
         from app.llm.model_factory import ModelFactory
         from app.utils.image_utils import build_openai_image_content_async
 
@@ -169,7 +170,7 @@ async def _ocr_pdf(file_path: Path, start_page: int, end_page: int) -> str:
     except ImportError:
         return "错误：OCR 模式需要安装 PyMuPDF 库。请运行: pip install PyMuPDF"
     except Exception as e:
-        return f"OCR 处理 PDF 时出错: {str(e)}"
+        return f"OCR 处理 PDF 时出错: {e!s}"
 
 
 def _read_word_sync(file_path: Path) -> str:
@@ -235,4 +236,4 @@ async def read_word(file_path: str) -> str:
     try:
         return await asyncio.to_thread(_read_word_sync, resolved)
     except Exception as e:
-        return f"读取 Word 文档时出错: {str(e)}"
+        return f"读取 Word 文档时出错: {e!s}"

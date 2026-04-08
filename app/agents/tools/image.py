@@ -1,7 +1,9 @@
 """图像工具 - 图像生成和编辑"""
 
 import json
+
 from langchain_core.tools import tool
+
 from app.llm.model_factory import ModelFactory
 
 
@@ -33,7 +35,7 @@ async def generate_image(prompt: str, size: str = "1664*928", n: int = 1) -> str
     """
     model = ModelFactory.get_text_to_image_model()
     urls = await model.agenerate(prompt=prompt, size=size, n=n)
-    
+
     return json.dumps({
         "type": "image_generated",
         "prompt": prompt,
@@ -67,7 +69,7 @@ async def edit_image(image_url: str, prompt: str) -> str:
     """
     model = ModelFactory.get_image_edit_model()
     url = await model.aedit(image_url=image_url, prompt=prompt)
-    
+
     return json.dumps({
         "type": "image_edited",
         "prompt": prompt,

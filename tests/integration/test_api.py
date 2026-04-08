@@ -1,4 +1,10 @@
 
+"""
+集成测试 - API 端点测试
+
+统一响应格式: {code: 0, message: "...", data: {...}}
+"""
+
 import pytest
 import pytest_asyncio
 from unittest.mock import patch, AsyncMock, MagicMock
@@ -9,6 +15,20 @@ from sqlalchemy.pool import StaticPool
 
 from app.main import create_app
 from app.core.database import Base, get_db
+
+
+def get_response_data(response):
+    """从统一响应格式中提取 data"""
+    json_data = response.json()
+    if isinstance(json_data, dict) and "data" in json_data:
+        return json_data["data"]
+    return json_data
+
+
+def get_access_token(login_response):
+    """从登录响应中提取 token"""
+    data = get_response_data(login_response)
+    return data["access_token"]
 
 
 SQLALCHEMY_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
@@ -83,7 +103,7 @@ class TestHealthCheck:
         ) as client:
             response = await client.get("/health")
             assert response.status_code == 200
-            data = response.json()
+            data = get_response_data(response)
             assert data["status"] == "healthy"
 
     @pytest.mark.asyncio
@@ -129,7 +149,7 @@ class TestAuthAPI:
                     "password": "testpassword123"
                 }
             )
-            
+
             response = await client.post(
                 "/api/v1/auth/login",
                 json={
@@ -138,7 +158,7 @@ class TestAuthAPI:
                 }
             )
             assert response.status_code == 200
-            data = response.json()
+            data = get_response_data(response)
             assert "access_token" in data
 
 
@@ -164,7 +184,7 @@ class TestConversationAPI:
                     "password": "password123"
                 }
             )
-            return login_response.json()["access_token"]
+            return get_access_token(login_response)
 
     @pytest.mark.asyncio
     async def test_create_conversation(self, mock_redis):
@@ -187,8 +207,8 @@ class TestConversationAPI:
                     "password": "password123"
                 }
             )
-            token = login_response.json()["access_token"]
-            
+            token = get_access_token(login_response)
+
             response = await client.post(
                 "/api/v1/conversations",
                 json={

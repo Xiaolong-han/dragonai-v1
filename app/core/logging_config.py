@@ -6,15 +6,38 @@
 - 处理器配置
 - 第三方库日志控制
 - 环境感知配置
+- 请求追踪 ID 支持
 """
 
-import os
 import json
 import logging
 import logging.handlers
-from datetime import datetime
-from typing import Dict, List, Optional
+from contextvars import ContextVar
+from pathlib import Path
 
+# 请求追踪 ID 上下文变量
+request_id_context: ContextVar[str | None] = ContextVar("request_id", default=None)
+user_id_context: ContextVar[int | None] = ContextVar("user_id", default=None)
+
+
+def get_request_id() -> str | None:
+    """获取当前请求的追踪 ID"""
+    return request_id_context.get()
+
+
+def set_request_id(request_id: str) -> None:
+    """设置当前请求的追踪 ID"""
+    request_id_context.set(request_id)
+
+
+def get_user_id() -> int | None:
+    """获取当前用户 ID"""
+    return user_id_context.get()
+
+
+def set_user_id(user_id: int | None) -> None:
+    """设置当前用户 ID"""
+    user_id_context.set(user_id)
 
 LOG_LEVELS = {
     "DEBUG": logging.DEBUG,
@@ -24,7 +47,7 @@ LOG_LEVELS = {
     "CRITICAL": logging.CRITICAL,
 }
 
-THIRD_PARTY_LOG_LEVELS: Dict[str, str] = {
+THIRD_PARTY_LOG_LEVELS: dict[str, str] = {
     "sqlalchemy.engine": "WARNING",
     "sqlalchemy.pool": "WARNING",
     "sqlalchemy.dialects": "WARNING",
@@ -46,15 +69,18 @@ THIRD_PARTY_LOG_LEVELS: Dict[str, str] = {
 
 
 class StructuredFormatter(logging.Formatter):
-    """结构化 JSON 日志格式化器"""
-    
+    """结构化 JSON 日志格式化器
+
+    自动从上下文变量获取请求追踪 ID 和用户 ID
+    """
+
     def format(self, record: logging.LogRecord) -> str:
         import datetime
-        ct = self.converter(record.created)
+        self.converter(record.created)
         timestamp = datetime.datetime.fromtimestamp(
-            record.created, tz=datetime.timezone.utc
+            record.created, tz=datetime.UTC
         ).strftime("%Y-%m-%d %H:%M:%S") + f",{int(record.msecs):03d}"
-        
+
         log_data = {
             "timestamp": timestamp,
             "level": record.levelname,
@@ -64,22 +90,33 @@ class StructuredFormatter(logging.Formatter):
             "function": record.funcName,
             "line": record.lineno,
         }
-        
-        if hasattr(record, "request_id") and record.request_id:
+
+        # 从上下文变量获取请求追踪 ID
+        request_id = get_request_id()
+        if request_id:
+            log_data["request_id"] = request_id
+
+        # 从 record 属性获取请求 ID（兼容旧方式）
+        elif hasattr(record, "request_id") and record.request_id:
             log_data["request_id"] = record.request_id
-        
+
+        # 从上下文变量获取用户 ID
+        user_id = get_user_id()
+        if user_id:
+            log_data["user_id"] = user_id
+
         if record.exc_info:
             log_data["exception"] = self.formatException(record.exc_info)
-        
+
         if hasattr(record, "extra_data") and record.extra_data:
             log_data["data"] = record.extra_data
-        
+
         return json.dumps(log_data, ensure_ascii=False)
 
 
 class ColoredConsoleFormatter(logging.Formatter):
     """彩色控制台日志格式化器"""
-    
+
     COLORS = {
         "DEBUG": "\033[36m",     # Cyan
         "INFO": "\033[32m",      # Green
@@ -88,7 +125,7 @@ class ColoredConsoleFormatter(logging.Formatter):
         "CRITICAL": "\033[35m",  # Magenta
     }
     RESET = "\033[0m"
-    
+
     def format(self, record: logging.LogRecord) -> str:
         color = self.COLORS.get(record.levelname, "")
         record.levelname = f"{color}{record.levelname}{self.RESET}"
@@ -97,7 +134,7 @@ class ColoredConsoleFormatter(logging.Formatter):
 
 class LoggerAdapter(logging.LoggerAdapter):
     """日志适配器，支持添加额外上下文"""
-    
+
     def process(self, msg, kwargs):
         extra = kwargs.get("extra", {})
         if self.extra:
@@ -124,7 +161,7 @@ def setup_logging(
     interval: int = 1,
 ) -> None:
     """设置日志配置
-    
+
     Args:
         log_level: 日志级别
         log_dir: 日志目录
@@ -137,21 +174,21 @@ def setup_logging(
         when: 时间轮转时机 (midnight, H, D, W0-W6)
         interval: 轮转间隔
     """
-    if not os.path.exists(log_dir):
-        os.makedirs(log_dir)
-    
+    if not Path(log_dir).exists():
+        Path(log_dir).mkdir(parents=True, exist_ok=True)
+
     root_logger = logging.getLogger()
     root_logger.setLevel(get_log_level(log_level))
-    
+
     for handler in root_logger.handlers[:]:
         root_logger.removeHandler(handler)
-    
-    handlers: List[logging.Handler] = []
-    
+
+    handlers: list[logging.Handler] = []
+
     if enable_console:
         console_handler = logging.StreamHandler()
         console_handler.setLevel(get_log_level(log_level))
-        
+
         if app_env == "development":
             console_format = ColoredConsoleFormatter(
                 "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
@@ -162,10 +199,10 @@ def setup_logging(
             )
         console_handler.setFormatter(console_format)
         handlers.append(console_handler)
-    
+
     if enable_file:
         file_handler = logging.handlers.TimedRotatingFileHandler(
-            os.path.join(log_dir, "app.log"),
+            str(Path(log_dir) / "app.log"),
             when=when,
             interval=interval,
             backupCount=backup_count,
@@ -176,9 +213,9 @@ def setup_logging(
             "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
         ))
         handlers.append(file_handler)
-        
+
         size_handler = logging.handlers.RotatingFileHandler(
-            os.path.join(log_dir, "app_size.log"),
+            str(Path(log_dir) / "app_size.log"),
             maxBytes=max_bytes,
             backupCount=backup_count,
             encoding="utf-8",
@@ -188,10 +225,10 @@ def setup_logging(
             "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
         ))
         handlers.append(size_handler)
-    
+
     if enable_structured:
         structured_handler = logging.handlers.TimedRotatingFileHandler(
-            os.path.join(log_dir, "structured.log"),
+            str(Path(log_dir) / "structured.log"),
             when=when,
             interval=interval,
             backupCount=backup_count,
@@ -200,41 +237,36 @@ def setup_logging(
         structured_handler.setLevel(get_log_level(log_level))
         structured_handler.setFormatter(StructuredFormatter())
         handlers.append(structured_handler)
-    
+
     for handler in handlers:
         root_logger.addHandler(handler)
-    
+
     configure_third_party_loggers(app_env)
 
 
 def configure_third_party_loggers(app_env: str = "development") -> None:
     """配置第三方库日志级别
-    
+
     Args:
-        app_env: 应用环境，开发环境下可以适当放宽日志级别
+        app_env: 应用环境
     """
     for logger_name, level in THIRD_PARTY_LOG_LEVELS.items():
         lib_logger = logging.getLogger(logger_name)
-        
-        if app_env == "development" and level == "WARNING":
-            lib_logger.setLevel(logging.INFO)
-        else:
-            lib_logger.setLevel(get_log_level(level))
-        
+        lib_logger.setLevel(get_log_level(level))
         lib_logger.propagate = True
-    
+
     sqlalchemy_logger = logging.getLogger("sqlalchemy.engine.Engine")
     sqlalchemy_logger.setLevel(logging.WARNING)
     sqlalchemy_logger.propagate = False
 
 
-def get_logger(name: str, extra: Optional[Dict] = None) -> logging.Logger:
+def get_logger(name: str, extra: dict | None = None) -> logging.Logger:
     """获取带有额外上下文的日志器
-    
+
     Args:
         name: 日志器名称
         extra: 额外上下文信息
-        
+
     Returns:
         配置好的日志器
     """
@@ -246,16 +278,16 @@ def get_logger(name: str, extra: Optional[Dict] = None) -> logging.Logger:
 
 class LogContext:
     """日志上下文管理器，用于临时修改日志级别"""
-    
+
     def __init__(self, logger_name: str, level: str):
         self.logger = logging.getLogger(logger_name)
         self.original_level = self.logger.level
         self.temp_level = get_log_level(level)
-    
+
     def __enter__(self):
         self.logger.setLevel(self.temp_level)
         return self.logger
-    
+
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.logger.setLevel(self.original_level)
         return False
@@ -266,7 +298,7 @@ def log_execution_time(logger: logging.Logger, operation: str = "operation"):
     def decorator(func):
         import functools
         import time
-        
+
         @functools.wraps(func)
         async def async_wrapper(*args, **kwargs):
             start_time = time.time()
@@ -279,7 +311,7 @@ def log_execution_time(logger: logging.Logger, operation: str = "operation"):
                 elapsed = time.time() - start_time
                 logger.error(f"[{operation}] 失败, 耗时: {elapsed:.3f}s, 错误: {e}")
                 raise
-        
+
         @functools.wraps(func)
         def sync_wrapper(*args, **kwargs):
             start_time = time.time()
@@ -292,10 +324,10 @@ def log_execution_time(logger: logging.Logger, operation: str = "operation"):
                 elapsed = time.time() - start_time
                 logger.error(f"[{operation}] 失败, 耗时: {elapsed:.3f}s, 错误: {e}")
                 raise
-        
+
         import asyncio
         if asyncio.iscoroutinefunction(func):
             return async_wrapper
         return sync_wrapper
-    
+
     return decorator

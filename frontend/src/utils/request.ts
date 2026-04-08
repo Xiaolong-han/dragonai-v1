@@ -29,7 +29,13 @@ request.interceptors.request.use(
 
 request.interceptors.response.use(
   (response) => {
-    return response.data
+    const data = response.data
+    // 自动解包新的统一响应格式 {code, message, data}
+    // 如果 code === 0 且有 data 字段，返回 data 内容
+    if (data && typeof data === 'object' && 'code' in data && data.code === 0 && 'data' in data) {
+      return data.data
+    }
+    return data
   },
   (error) => {
     console.error('Response error:', error)

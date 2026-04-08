@@ -1,5 +1,5 @@
 from functools import lru_cache
-from typing import Optional
+
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -30,7 +30,6 @@ class AgentMiddlewareSettings(BaseSettings):
     memory_enable_extraction: bool = True  # 是否启用自动提取
     memory_enable_semantic_search: bool = True  # 是否启用语义检索
     memory_extraction_interval: int = 3  # 每 N 轮对话后提取记忆
-    # memory_trigger_keywords: list[str] = None  # 触发关键词（使用默认值）
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -44,7 +43,7 @@ class Settings(BaseSettings):
     app_name: str = "DragonAI"
     app_env: str = "development"
     app_debug: bool = True
-    app_host: str = "0.0.0.0"
+    app_host: str = "0.0.0.0"  # nosec B104  # 开发环境默认值，生产环境应覆盖
     app_port: int = 8000
 
     secret_key: str = "your-secret-key-here-change-in-production"
@@ -121,7 +120,7 @@ class Settings(BaseSettings):
     )
 
 
-@lru_cache()
+@lru_cache
 def get_settings() -> Settings:
     return Settings()
 

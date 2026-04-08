@@ -5,7 +5,7 @@ import asyncio
 import json
 from unittest.mock import AsyncMock, patch, MagicMock
 
-from app.utils.sse import sse_with_heartbeat, SSE_HEARTBEAT_INTERVAL
+from app.services.stream.sse_heartbeat import sse_with_heartbeat, SSE_HEARTBEAT_INTERVAL
 
 
 class TestSSEHeartbeat:

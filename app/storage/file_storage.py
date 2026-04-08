@@ -3,7 +3,7 @@
 import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+
 from fastapi import UploadFile
 
 from app.config import settings
@@ -12,7 +12,7 @@ from app.config import settings
 class FileStorage:
     """本地文件系统存储管理器"""
 
-    def __init__(self, base_dir: Optional[str] = None):
+    def __init__(self, base_dir: str | None = None):
         self.base_dir = Path(base_dir or settings.storage_dir)
         self._ensure_directories()
 
@@ -43,7 +43,7 @@ class FileStorage:
     async def save_file(
         self,
         file: UploadFile,
-        file_type: Optional[str] = None,
+        file_type: str | None = None,
     ) -> dict:
         """
         保存上传的文件到本地文件系统
@@ -79,7 +79,7 @@ class FileStorage:
             "upload_time": datetime.now().isoformat(),
         }
 
-    def get_file_path(self, relative_path: str) -> Optional[Path]:
+    def get_file_path(self, relative_path: str) -> Path | None:
         """
         根据相对路径获取文件的完整路径
 
@@ -114,7 +114,7 @@ class FileStorage:
             return True
         return False
 
-    def get_file_info(self, relative_path: str) -> Optional[dict]:
+    def get_file_info(self, relative_path: str) -> dict | None:
         """
         获取文件信息
 

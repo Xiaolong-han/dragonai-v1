@@ -86,6 +86,9 @@ dragonai-v2-local/
 │   │   ├── user.py               # 用户模型
 │   │   ├── conversation.py       # 会话模型
 │   │   └── message.py            # 消息模型
+│   ├── monitoring/               # Prometheus 监控指标
+│   │   ├── metrics.py            # 指标定义 (LLM/工具/缓存)
+│   │   └── callbacks.py          # LangChain 回调处理器
 │   ├── rag/                      # RAG 模块
 │   │   ├── loader.py             # 文档加载
 │   │   ├── splitter.py           # 文本分割
@@ -93,6 +96,7 @@ dragonai-v2-local/
 │   │   ├── hybrid_retriever.py   # 混合检索
 │   │   └── reranker.py           # 重排序
 │   ├── schemas/                  # Pydantic 模型
+│   │   └── response.py           # 统一响应模型
 │   ├── security/                 # 安全模块
 │   │   ├── auth.py               # JWT 认证
 │   │   ├── token_blacklist.py    # Token 黑名单
@@ -149,6 +153,8 @@ dragonai-v2-local/
 │   ├── unit/                     # 单元测试
 │   └── integration/              # 集成测试
 ├── scripts/                      # 脚本文件
+│   ├── init_db.py                # 数据库初始化
+│   └── metrics_viewer.py         # Prometheus 监控仪表盘
 └── storage/                      # 运行时存储
     ├── skills/                   # 技能文件 (SKILL.md)
     └── chroma_db/                # ChromaDB 持久化
@@ -262,6 +268,19 @@ docker-compose logs -f
 docker-compose down
 ```
 
+### 监控命令
+
+```bash
+# 启动本地监控仪表盘 (需安装 rich 和 requests)
+python scripts/metrics_viewer.py
+
+# 指定服务地址和刷新间隔
+python scripts/metrics_viewer.py --url http://localhost:8000 --interval 5
+
+# 直接获取 Prometheus 指标
+curl http://localhost:8000/api/v1/monitoring/metrics
+```
+
 ## 🧪 测试命令
 
 ```bash
@@ -275,6 +294,61 @@ pytest tests/unit/test_chat_service.py
 # 带覆盖率报告
 pytest --cov=app tests/
 ```
+
+## 🔍 代码质量检查
+
+项目配置了完整的代码质量检查工具链，包括 ruff、mypy 和 bandit。
+
+### Ruff (代码风格检查)
+
+```bash
+# 检查代码风格
+ruff check app
+
+# 自动修复问题
+ruff check app --fix
+
+# 启用 unsafe-fixes 修复更多问题
+ruff check app --fix --unsafe-fixes
+
+# 格式化代码
+ruff format app
+```
+
+### Mypy (类型检查)
+
+```bash
+# 运行类型检查
+mypy app
+
+# 检查特定文件
+mypy app/agents/agent_factory.py
+```
+
+### Bandit (安全扫描)
+
+```bash
+# 运行安全扫描
+bandit -r app -ll
+
+# 排除特定目录
+bandit -r app -ll --exclude tests,.venv,alembic
+```
+
+### 一键检查
+
+```bash
+# 运行所有检查
+ruff check app && mypy app && bandit -r app -ll
+```
+
+### 配置文件
+
+代码质量工具配置在 `pyproject.toml` 中：
+
+- **Ruff**: 替代 flake8、isort，配置规则集兼容 black
+- **Mypy**: 类型检查，宽松模式以支持渐进式类型注解
+- **Bandit**: 安全扫描，已排除测试目录和开发默认值
 
 ## 📝 代码规范
 
@@ -544,6 +618,59 @@ storage/skills/
 **Agent 使用技能**:
 当用户请求匹配技能描述时，Agent 会自动调用 `read_file` 读取技能文件，并严格按照技能中的流程执行。
 
+### 监控模块 (app/monitoring/)
+
+基于 Prometheus 的监控指标收集系统，支持 LLM 调用、工具调用、缓存操作等核心指标。
+
+**指标类型**:
+- `llm_calls_total` - LLM 调用次数（按模型、状态分组）
+- `llm_tokens_total` - Token 消耗（按模型、类型分组）
+- `llm_latency_seconds` - LLM 响应延迟分布
+- `tool_calls_total` - 工具调用次数（按工具、状态分组）
+- `sse_connections_active` - 活跃 SSE 连接数
+- `cache_operations_total` - 缓存操作次数
+
+**使用方式**:
+```python
+from app.monitoring import record_llm_call, record_tool_call, record_agent_execution
+
+# 记录 LLM 调用
+record_llm_call(
+    model="glm-5",
+    status="success",
+    latency_seconds=2.3,
+    input_tokens=100,
+    output_tokens=50
+)
+
+# 记录工具调用
+record_tool_call(tool="web_search", status="success", latency_seconds=1.5)
+
+# 记录 Agent 执行
+record_agent_execution(agent_type="expert", status="success", latency_seconds=5.0)
+```
+
+**装饰器方式**:
+```python
+from app.monitoring import track_llm_call, track_tool_call
+
+@track_llm_call("glm-5")
+async def my_llm_function():
+    ...
+
+@track_tool_call("web_search")
+async def my_tool():
+    ...
+```
+
+**LangChain 回调处理器**:
+```python
+from app.monitoring import get_metrics_callback_handler
+
+model = ChatTongyi(...)
+model.callbacks = [get_metrics_callback_handler()]
+```
+
 ### RAG 混合检索 (app/rag/hybrid_retriever.py)
 
 ```python
@@ -591,6 +718,172 @@ results = await retriever.aretrieve(query="查询文本", k=4)
 **监控**:
 - `GET /api/v1/monitoring/health` - 健康检查
 - `GET /api/v1/monitoring/cache` - 缓存状态
+- `GET /api/v1/monitoring/metrics` - Prometheus 指标 (文本格式)
+
+## 📡 API 响应规范
+
+### 统一响应格式
+
+所有 API 响应使用统一格式：
+
+```json
+{
+    "code": 0,           // 状态码，0 表示成功，非 0 表示错误
+    "message": "success", // 响应消息
+    "data": { ... }       // 响应数据（可选）
+}
+```
+
+### 错误码规范
+
+| 范围 | 说明 |
+|------|------|
+| 0 | 成功 |
+| 1000-1999 | 客户端错误 (HTTP 4xx) |
+| 2000-2999 | 服务端错误 (HTTP 5xx) |
+| 3000-3999 | 业务逻辑错误 |
+
+**常用错误码**:
+
+| 错误码 | 名称 | HTTP 状态码 | 说明 |
+|--------|------|-------------|------|
+| 1000 | BAD_REQUEST | 400 | 错误请求 |
+| 1001 | UNAUTHORIZED | 401 | 未授权 |
+| 1003 | FORBIDDEN | 403 | 禁止访问 |
+| 1004 | NOT_FOUND | 404 | 资源未找到 |
+| 1022 | VALIDATION_ERROR | 422 | 验证错误 |
+| 1029 | RATE_LIMIT_EXCEEDED | 429 | 请求限流 |
+| 2000 | INTERNAL_ERROR | 500 | 服务器内部错误 |
+| 2002 | EXTERNAL_SERVICE_ERROR | 502 | 外部服务错误 |
+| 2004 | GATEWAY_TIMEOUT | 504 | 网关超时 |
+
+### 响应构建器
+
+使用 `ResponseBuilder` 构建响应：
+
+```python
+from app.schemas.response import ResponseBuilder
+
+# 成功响应
+return ResponseBuilder.success(data={"id": 1}, message="操作成功")
+
+# 错误响应
+return ResponseBuilder.error(code=1004, message="资源未找到")
+
+# 分页响应
+return ResponseBuilder.paged(items=[...], total=100, page=1, page_size=20)
+
+# 便捷方法
+return ResponseBuilder.not_found("会话")           # 404
+return ResponseBuilder.unauthorized("未登录")     # 401
+return ResponseBuilder.forbidden("无权限")        # 403
+return ResponseBuilder.bad_request("参数错误")    # 400
+return ResponseBuilder.validation_error("格式错误", details={})
+return ResponseBuilder.rate_limited(retry_after=60)  # 429
+```
+
+**ErrorCode 定义** (`app/schemas/response.py`):
+- `SUCCESS` (0) - 成功
+- `BAD_REQUEST` (1000), `UNAUTHORIZED` (1001), `FORBIDDEN` (1003), `NOT_FOUND` (1004)
+- `VALIDATION_ERROR` (1022), `RATE_LIMIT_EXCEEDED` (1029)
+- `INTERNAL_ERROR` (2000), `EXTERNAL_SERVICE_ERROR` (2002), `GATEWAY_TIMEOUT` (2004)
+- `AGENT_ERROR` (3100), `AGENT_TIMEOUT` (3101), `TOOL_CALL_LIMIT` (3102), `LLM_ERROR` (3103)
+
+## ⚠️ 异常处理
+
+### 自定义异常体系
+
+```python
+from app.core.exceptions import (
+    DragonAIException,      # 基础异常
+    NotFoundException,       # 资源未找到 (404)
+    UnauthorizedException,   # 未授权 (401)
+    ForbiddenException,      # 禁止访问 (403)
+    BadRequestException,     # 错误请求 (400)
+    ValidationException,     # 验证错误 (422)
+    ConflictException,       # 冲突错误 (409)
+    RateLimitException,      # 限流异常 (429)
+    ExternalServiceException,# 外部服务错误 (502)
+    LLMException,            # LLM 服务错误
+    AgentTimeoutException,   # Agent 超时
+    ToolCallLimitException,  # 工具调用限制
+)
+```
+
+### 使用示例
+
+```python
+# 抛出异常
+raise NotFoundException(
+    message="会话不存在",
+    resource_type="conversation",
+    resource_id=conversation_id
+)
+
+# 验证错误
+raise ValidationException(
+    message="参数验证失败",
+    errors=[{"field": "email", "message": "邮箱格式错误"}]
+)
+
+# 外部服务错误
+raise ExternalServiceException(
+    message="LLM 服务不可用",
+    service_name="dashscope"
+)
+```
+
+### 全局异常处理器
+
+所有异常都会被全局异常处理器捕获并转换为统一响应格式：
+
+- `DragonAIException` -> 业务异常响应
+- `RequestValidationError` -> 参数验证错误响应
+- `RateLimitExceeded` -> 限流响应
+- `Exception` -> 通用服务器错误响应
+
+## 📝 日志系统
+
+### 结构化日志
+
+日志支持 JSON 格式输出，包含请求追踪 ID：
+
+```json
+{
+    "timestamp": "2026-03-22 10:30:00,123",
+    "level": "INFO",
+    "logger": "app.services.chat_service",
+    "message": "Message sent successfully",
+    "module": "chat_service",
+    "function": "send_message",
+    "line": 42,
+    "request_id": "abc-123-def",
+    "user_id": 1,
+    "data": {"conversation_id": 123}
+}
+```
+
+### 日志配置
+
+```python
+from app.core.logging_config import get_logger, set_request_id, set_user_id
+
+# 设置请求追踪 ID
+set_request_id("abc-123-def")
+set_user_id(1)
+
+# 获取日志器
+logger = get_logger("app.services.chat_service")
+
+# 记录日志
+logger.info("Message sent", extra={"extra_data": {"conversation_id": 123}})
+```
+
+### 日志文件
+
+- `logs/app.log` - 标准日志（按天轮转）
+- `logs/app_size.log` - 标准日志（按大小轮转）
+- `logs/structured.log` - 结构化 JSON 日志
 
 ## 🐛 常见问题
 

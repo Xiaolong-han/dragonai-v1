@@ -28,11 +28,11 @@ Agent 可通过 read_file 读取自动提取的记忆：
 import json
 import logging
 import re
-from typing import Any, Optional
 from datetime import datetime
+from typing import Any
 
 from langchain.agents.middleware import AgentMiddleware, AgentState
-from langchain.messages import HumanMessage, AIMessage
+from langchain.messages import AIMessage, HumanMessage
 
 logger = logging.getLogger(__name__)
 
@@ -126,7 +126,7 @@ class MemoryMiddleware(AgentMiddleware):
         enable_extraction: bool = True,
         enable_semantic_search: bool = True,
         extraction_interval: int = 3,
-        trigger_keywords: Optional[list[str]] = None,
+        trigger_keywords: list[str] | None = None,
     ):
         self.store = store
         self.model = model
@@ -146,7 +146,7 @@ class MemoryMiddleware(AgentMiddleware):
             user_id = getattr(context, "user_id", "default")
         return (user_id, "memories")
 
-    def _get_last_user_message(self, state: AgentState) -> Optional[str]:
+    def _get_last_user_message(self, state: AgentState) -> str | None:
         """获取最后一条用户消息"""
         messages = state.get("messages", [])
         for msg in reversed(messages):
@@ -265,7 +265,7 @@ class MemoryMiddleware(AgentMiddleware):
                     additional_kwargs={"lc_source": "memory_loader"}
                 )
 
-                return {"messages": [memory_message] + state.get("messages", [])}
+                return {"messages": [memory_message, *state.get("messages", [])]}
 
         except Exception as e:
             logger.warning(f"[MEMORY] Failed to load memories: {e}")
@@ -290,7 +290,7 @@ class MemoryMiddleware(AgentMiddleware):
         # 判断是否应该提取
         should_extract, reason = self._should_extract(state, meta)
         if not should_extract:
-            logger.debug(f"[MEMORY] Skip extraction, waiting for trigger")
+            logger.debug("[MEMORY] Skip extraction, waiting for trigger")
             return None
 
         conversation = self._get_conversation_summary(state)
@@ -341,7 +341,7 @@ class MemoryMiddleware(AgentMiddleware):
 
         return "\n".join(parts)
 
-    def _parse_extraction(self, content: str) -> Optional[dict]:
+    def _parse_extraction(self, content: str) -> dict | None:
         """解析模型输出的 JSON"""
         try:
             # 尝试提取 JSON 块

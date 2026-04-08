@@ -1,26 +1,25 @@
-from typing import List
-from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
+import logging
+
+from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.database import get_db
 from app.api.dependencies import get_current_active_user
-from app.api.middleware import limiter, CHAT_RATE_LIMIT
+from app.api.middleware import CHAT_RATE_LIMIT, limiter
+from app.core.database import get_db
+from app.core.exceptions import NotFoundException
 from app.models.user import User
-from app.schemas.message import (
-    ChatRequest,
-    ChatHistoryResponse,
-    MessageCreate
-)
+from app.schemas.message import ChatRequest, MessageCreate
+from app.schemas.response import ResponseBuilder
 from app.services.chat_service import chat_service
 from app.services.conversation_service import conversation_service
 from app.services.stream import sse_with_heartbeat
 
 router = APIRouter(prefix="/chat", tags=["聊天"])
-logger = __import__("logging").getLogger(__name__)
+logger = logging.getLogger(__name__)
 
 
-@router.get("/conversations/{conversation_id}/history", response_model=ChatHistoryResponse)
+@router.get("/conversations/{conversation_id}/history")
 @limiter.limit(CHAT_RATE_LIMIT)
 async def get_chat_history(
     request: Request,
@@ -32,11 +31,12 @@ async def get_chat_history(
 ):
     conv = await conversation_service.get_conversation(db, conversation_id=conversation_id, user_id=current_user.id)
     if not conv:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Conversation not found"
+        raise NotFoundException(
+            message="会话不存在",
+            resource_type="conversation",
+            resource_id=conversation_id
         )
-    
+
     messages = await chat_service.get_messages(
         db,
         conversation_id=conversation_id,
@@ -44,7 +44,7 @@ async def get_chat_history(
         skip=skip,
         limit=limit
     )
-    return ChatHistoryResponse(messages=messages, total=len(messages))
+    return ResponseBuilder.success(data={"messages": messages, "total": len(messages)})
 
 
 @router.post("/send")
@@ -61,11 +61,12 @@ async def send_chat_message(
         user_id=current_user.id
     )
     if not conv:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Conversation not found"
+        raise NotFoundException(
+            message="会话不存在",
+            resource_type="conversation",
+            resource_id=chat_request.conversation_id
         )
-    
+
     await chat_service.create_message(
         db,
         conversation_id=chat_request.conversation_id,
@@ -76,7 +77,7 @@ async def send_chat_message(
         ),
         user_id=current_user.id
     )
-    
+
     return StreamingResponse(
         sse_with_heartbeat(chat_service.generate_sse_stream(
             db=db,

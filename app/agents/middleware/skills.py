@@ -3,8 +3,8 @@
 继承自 DeepAgents 的 SkillsMiddleware，添加自定义系统提示模板支持。
 """
 
-from deepagents.middleware.skills import SkillsMiddleware
 from deepagents.backends.protocol import BACKEND_TYPES
+from deepagents.middleware.skills import SkillsMiddleware
 
 
 class CustomSkillsMiddleware(SkillsMiddleware):

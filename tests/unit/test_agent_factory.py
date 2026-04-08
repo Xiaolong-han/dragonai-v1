@@ -20,19 +20,21 @@ class TestAgentFactoryWarmup:
              patch.object(AgentFactory, 'get_store') as mock_store, \
              patch('app.agents.agent_factory.create_agent') as mock_create_agent, \
              patch('app.agents.agent_factory.ModelFactory.get_general_model') as mock_model:
-            
+
             mock_checkpointer.return_value = MagicMock()
             mock_store.return_value = MagicMock()
             mock_create_agent.return_value = MagicMock()
             mock_model.return_value = MagicMock()
-            
+
             await AgentFactory.warmup()
-            
+
             assert len(AgentFactory._agent_cache) == 4
-            assert "expert_False_thinking_False" in AgentFactory._agent_cache
-            assert "expert_True_thinking_False" in AgentFactory._agent_cache
-            assert "expert_False_thinking_True" in AgentFactory._agent_cache
-            assert "expert_True_thinking_True" in AgentFactory._agent_cache
+            # 检查 key 包含预期的配置部分
+            cache_keys = list(AgentFactory._agent_cache.keys())
+            assert any("expert_False_thinking_False" in key for key in cache_keys)
+            assert any("expert_True_thinking_False" in key for key in cache_keys)
+            assert any("expert_False_thinking_True" in key for key in cache_keys)
+            assert any("expert_True_thinking_True" in key for key in cache_keys)
 
     @pytest.mark.asyncio
     async def test_warmup_continues_on_failure(self):

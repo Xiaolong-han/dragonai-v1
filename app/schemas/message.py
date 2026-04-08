@@ -1,12 +1,13 @@
 from datetime import datetime
-from typing import Optional, List, Any, Dict
-from pydantic import BaseModel, Field, field_validator, ConfigDict
+from typing import Any
+
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class MessageBase(BaseModel):
     role: str = Field(..., max_length=20)
     content: str
-    extra_data: Optional[Dict[str, Any]] = None
+    extra_data: dict[str, Any] | None = None
 
     @field_validator('extra_data', mode='before')
     @classmethod
@@ -23,8 +24,8 @@ class MessageCreate(MessageBase):
 
 
 class MessageUpdate(BaseModel):
-    content: Optional[str] = None
-    extra_data: Optional[Dict[str, Any]] = None
+    content: str | None = None
+    extra_data: dict[str, Any] | None = None
 
 
 class MessageResponse(MessageBase):
@@ -38,9 +39,9 @@ class MessageResponse(MessageBase):
 class ChatRequest(BaseModel):
     conversation_id: int
     content: str
-    is_expert: Optional[bool] = Field(False, description="是否使用专家模型")
-    enable_thinking: Optional[bool] = Field(False, description="是否启用深度思考模式")
-    attachments: Optional[List[str]] = Field(None, description="附件列表（图片或文档路径）")
+    is_expert: bool | None = Field(False, description="是否使用专家模型")
+    enable_thinking: bool | None = Field(False, description="是否启用深度思考模式")
+    attachments: list[str] | None = Field(None, description="附件列表（图片或文档路径）")
 
 
 class ChatMessageItem(BaseModel):
@@ -49,5 +50,5 @@ class ChatMessageItem(BaseModel):
 
 
 class ChatHistoryResponse(BaseModel):
-    messages: List[MessageResponse]
+    messages: list[MessageResponse]
     total: int

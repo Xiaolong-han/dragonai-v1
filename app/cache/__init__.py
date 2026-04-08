@@ -1,16 +1,16 @@
 """缓存模块"""
 
-from .redis import redis_client, cache_aside, invalidate_cache_by_pattern, cached
-from .warmup import cache_warmup, CacheWarmup
 from .metrics import cache_metrics, get_cache_stats
+from .redis import cache_aside, cached, invalidate_cache_by_pattern, redis_client
+from .warmup import CacheWarmup, cache_warmup
 
 __all__ = [
-    "redis_client",
-    "cache_aside",
-    "invalidate_cache_by_pattern",
-    "cached",
-    "cache_warmup",
     "CacheWarmup",
+    "cache_aside",
     "cache_metrics",
+    "cache_warmup",
+    "cached",
     "get_cache_stats",
+    "invalidate_cache_by_pattern",
+    "redis_client",
 ]

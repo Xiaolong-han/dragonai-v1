@@ -1,7 +1,9 @@
 """RAG工具 - 知识库检索"""
 
 import json
+
 from langchain_core.tools import tool
+
 from app.services.knowledge_service import get_knowledge_service
 
 

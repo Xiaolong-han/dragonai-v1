@@ -16,7 +16,13 @@
       "Bash(mv web_search_tool.py web_search.py)",
       "Bash(mv multimodal_tool.py multimodal.py)",
       "Bash(mv image_tools.py image.py)",
-      "Bash(mv code_tools.py code.py)"
+      "Bash(mv code_tools.py code.py)",
+      "Bash(sort -t'%' -k2 -n)",
+      "Bash(.venv/Scripts/pip install:*)",
+      "Bash(.venv/Scripts/ruff check:*)",
+      "Bash(.venv/Scripts/bandit -r app -ll --exclude tests,.venv,alembic,migrations)",
+      "Bash(.venv/Scripts/mypy app:*)",
+      "Bash(timeout 120)"
     ]
   }
 }

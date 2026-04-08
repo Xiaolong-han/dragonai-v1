@@ -1,30 +1,30 @@
 """重排序器模块"""
 
-from abc import ABC, abstractmethod
-from typing import List, Optional
-from langchain_core.documents import Document
 import logging
+from abc import ABC, abstractmethod
+
+from langchain_core.documents import Document
 
 logger = logging.getLogger(__name__)
 
 
 class BaseReranker(ABC):
     """重排序器基类"""
-    
+
     @abstractmethod
     async def rerank(
         self,
         query: str,
-        documents: List[Document],
+        documents: list[Document],
         top_k: int = 4,
-    ) -> List[Document]:
+    ) -> list[Document]:
         """重排序文档
-        
+
         Args:
             query: 查询文本
             documents: 待排序的文档列表
             top_k: 返回的文档数量
-            
+
         Returns:
             重排序后的文档列表
         """
@@ -33,7 +33,7 @@ class BaseReranker(ABC):
 
 class CohereReranker(BaseReranker):
     """Cohere Rerank API"""
-    
+
     def __init__(self, model: str = "rerank-multilingual"):
         """
         Args:
@@ -51,23 +51,23 @@ class CohereReranker(BaseReranker):
         except Exception as e:
             logger.warning(f"[RAG] Failed to initialize CohereReranker: {e}")
             self._available = False
-    
+
     async def rerank(
         self,
         query: str,
-        documents: List[Document],
+        documents: list[Document],
         top_k: int = 4,
-    ) -> List[Document]:
+    ) -> list[Document]:
         if not documents or not self._available:
             return documents[:top_k] if documents else []
-        
+
         try:
             reranked = await self._reranker.arerank(
                 documents=[doc.page_content for doc in documents],
                 query=query,
                 top_n=min(top_k, len(documents)),
             )
-            
+
             return [documents[r.index] for r in reranked]
         except Exception as e:
             logger.error(f"[RAG] Cohere rerank failed: {e}")
@@ -76,11 +76,11 @@ class CohereReranker(BaseReranker):
 
 class CrossEncoderReranker(BaseReranker):
     """本地 Cross-Encoder 模型重排序
-    
+
     使用 sentence-transformers 的 Cross-Encoder 模型，
     无需网络调用，适合离线场景。
     """
-    
+
     def __init__(self, model_name: str = "BAAI/bge-reranker-base"):
         """
         Args:
@@ -100,24 +100,24 @@ class CrossEncoderReranker(BaseReranker):
         except Exception as e:
             logger.warning(f"[RAG] Failed to initialize CrossEncoderReranker: {e}")
             self._available = False
-    
+
     async def rerank(
         self,
         query: str,
-        documents: List[Document],
+        documents: list[Document],
         top_k: int = 4,
-    ) -> List[Document]:
+    ) -> list[Document]:
         if not documents or not self._available:
             return documents[:top_k] if documents else []
-        
+
         try:
             pairs = [[query, doc.page_content] for doc in documents]
-            
+
             scores = self._model.predict(pairs)
-            
+
             scored_docs = list(zip(documents, scores))
             scored_docs.sort(key=lambda x: x[1], reverse=True)
-            
+
             return [doc for doc, _ in scored_docs[:top_k]]
         except Exception as e:
             logger.error(f"[RAG] CrossEncoder rerank failed: {e}")
@@ -126,21 +126,21 @@ class CrossEncoderReranker(BaseReranker):
 
 def get_reranker(
     provider: str = "cross-encoder",
-    model_name: Optional[str] = None,
+    model_name: str | None = None,
     **kwargs,
-) -> Optional[BaseReranker]:
+) -> BaseReranker | None:
     """获取重排序器
-    
+
     Args:
         provider: "cohere" | "cross-encoder"
         model_name: 模型名称 (仅 cross-encoder 使用)
-        
+
     Returns:
         重排序器实例，如果初始化失败返回 None
     """
     if provider == "cohere":
         reranker = CohereReranker(**kwargs)
         return reranker if reranker._available else None
-    
+
     reranker = CrossEncoderReranker(model_name=model_name or "BAAI/bge-reranker-base", **kwargs)
     return reranker if reranker._available else None

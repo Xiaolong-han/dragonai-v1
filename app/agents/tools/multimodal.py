@@ -1,6 +1,7 @@
 """多模态工具 - 图片理解和 OCR"""
 
 from langchain_core.tools import tool
+
 from app.llm.model_factory import ModelFactory
 from app.utils.image_utils import build_openai_image_content_async
 
@@ -25,11 +26,11 @@ async def understand_image(image_url: str) -> str:
         图片内容的详细描述
     """
     model = ModelFactory.get_vision_model(is_ocr=False)
-    
+
     prompt = "请详细描述这张图片的内容，包括场景、物体、人物、颜色等细节。"
     content = await build_openai_image_content_async(image_url, prompt)
     messages = [{"role": "user", "content": content}]
-    
+
     result = await model.ainvoke(messages)
     return result.content
 
@@ -56,10 +57,10 @@ async def ocr_document(image_url: str) -> str:
         图片中识别出的文字内容
     """
     model = ModelFactory.get_vision_model(is_ocr=True)
-    
+
     prompt = "请提取这张图片中的所有文字内容，保持原有格式。"
     content = await build_openai_image_content_async(image_url, prompt)
     messages = [{"role": "user", "content": content}]
-    
+
     result = await model.ainvoke(messages)
     return result.content

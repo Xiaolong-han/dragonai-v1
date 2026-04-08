@@ -175,7 +175,6 @@ async def mock_redis():
     with patch('app.cache.redis.redis_client', mock_client), \
          patch('app.services.conversation_service.redis_client', mock_client), \
          patch('app.services.repositories.message_repository.redis_client', mock_client), \
-         patch('app.core.token_blacklist.redis_client', mock_client), \
          patch('app.security.token_blacklist.redis_client', mock_client):
         yield mock_client
 
@@ -256,18 +255,19 @@ async def auth_token(client, test_user_data, mock_redis):
     """提供认证 Token"""
     # 注册用户
     register_response = await client.post("/api/v1/auth/register", json=test_user_data)
-    assert register_response.status_code == 201, f"注册失败: {register_response.text}"
-    
+    assert register_response.status_code == 200, f"注册失败: {register_response.text}"
+
     # 登录获取 Token
     login_response = await client.post("/api/v1/auth/login", json={
         "username": test_user_data["username"],
         "password": test_user_data["password"]
     })
     assert login_response.status_code == 200, f"登录失败: {login_response.text}"
-    
+
     data = login_response.json()
-    assert "access_token" in data, f"响应中没有 access_token: {data}"
-    return data["access_token"]
+    # 新格式: {code: 0, message: "...", data: {access_token: "...", token_type: "bearer"}}
+    assert "data" in data and "access_token" in data["data"], f"响应中没有 access_token: {data}"
+    return data["data"]["access_token"]
 
 
 @pytest_asyncio.fixture
@@ -290,7 +290,9 @@ async def test_conversation(authenticated_client):
         "/api/v1/conversations",
         json={"title": "Test Conversation", "model_name": "qwen-flash"}
     )
-    return response.json()
+    data = response.json()
+    # 新格式: {code: 0, message: "...", data: {...}}
+    return data.get("data", data)
 
 
 @pytest_asyncio.fixture

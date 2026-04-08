@@ -1,37 +1,37 @@
 
 from pathlib import Path
-from typing import List, Union
-from langchain_core.documents import Document
+
 from langchain_community.document_loaders import (
-    PyPDFLoader,
     Docx2txtLoader,
-    UnstructuredMarkdownLoader,
+    PyPDFLoader,
     TextLoader,
+    UnstructuredMarkdownLoader,
 )
+from langchain_core.documents import Document
 
 
 class DocumentLoader:
     SUPPORTED_EXTENSIONS = {".pdf", ".docx", ".md", ".markdown", ".txt"}
 
     @classmethod
-    def load_file(cls, file_path: Union[str, Path]) -> List[Document]:
+    def load_file(cls, file_path: str | Path) -> list[Document]:
         file_path = Path(file_path)
         if not file_path.exists():
             raise FileNotFoundError(f"File not found: {file_path}")
-        
+
         ext = file_path.suffix.lower()
         if ext not in cls.SUPPORTED_EXTENSIONS:
             raise ValueError(f"Unsupported file format: {ext}")
-        
+
         loader = cls._get_loader(file_path, ext)
         documents = loader.load()
-        
+
         for doc in documents:
             if "source" not in doc.metadata:
                 doc.metadata["source"] = str(file_path)
             if "file_name" not in doc.metadata:
                 doc.metadata["file_name"] = file_path.name
-        
+
         return documents
 
     @classmethod

@@ -4,41 +4,36 @@ import asyncio
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, Union, Dict, Any
+from typing import Any
 
+from deepagents.backends import CompositeBackend, StateBackend, StoreBackend
+from deepagents.backends.filesystem import FilesystemBackend
+from deepagents.middleware.filesystem import FilesystemMiddleware
+from deepagents.middleware.patch_tool_calls import PatchToolCallsMiddleware
 from langchain.agents import create_agent
 from langchain.agents.middleware import (
-    SummarizationMiddleware,
-    ContextEditingMiddleware,
-    ClearToolUsesEdit,
-    LLMToolSelectorMiddleware,
-    ToolCallLimitMiddleware,
-    ToolRetryMiddleware,
     ModelCallLimitMiddleware,
     ModelFallbackMiddleware,
+    SummarizationMiddleware,
     TodoListMiddleware,
+    ToolCallLimitMiddleware,
+    ToolRetryMiddleware,
 )
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
+from langgraph.store.memory import BaseStore, InMemoryStore
 
-from deepagents.middleware.patch_tool_calls import PatchToolCallsMiddleware
-from deepagents.middleware.filesystem import FilesystemMiddleware
-from deepagents.backends.filesystem import FilesystemBackend
-from deepagents.backends import CompositeBackend, StateBackend, StoreBackend
-
-from langgraph.store.memory import InMemoryStore, BaseStore
-
-from app.config import settings
-from app.llm.model_factory import ModelFactory
+from app.agents.middleware import CustomSkillsMiddleware, MemoryMiddleware
 from app.agents.prompts import (
-    SYSTEM_PROMPT,
-    WRITE_TODOS_SYSTEM_PROMPT_CN,
-    WRITE_TODOS_TOOL_DESCRIPTION_CN,
     FILESYSTEM_SYSTEM_PROMPT_CN,
     FILESYSTEM_TOOL_DESCRIPTIONS_CN,
     SKILLS_SYSTEM_PROMPT_CN,
+    SYSTEM_PROMPT,
+    WRITE_TODOS_SYSTEM_PROMPT_CN,
+    WRITE_TODOS_TOOL_DESCRIPTION_CN,
 )
-from app.agents.middleware import MemoryMiddleware, CustomSkillsMiddleware
+from app.config import settings
+from app.llm.model_factory import ModelFactory
 
 logger = logging.getLogger(__name__)
 
@@ -52,13 +47,13 @@ class AgentContext:
 class AgentFactory:
     """Agent工厂类 - 使用LangChain 1.0+推荐的create_agent"""
 
-    _checkpointer: Optional[Union[AsyncPostgresSaver, InMemorySaver]] = None
-    _context_manager: Optional[object] = None
+    _checkpointer: AsyncPostgresSaver | InMemorySaver | None = None
+    _context_manager: object | None = None
     _initialized: bool = False
-    _agent_cache: Dict[str, Any] = {}
-    _skills_backend: Optional[FilesystemBackend] = None
-    _store: Optional[BaseStore] = None
-    _store_context: Optional[object] = None
+    _agent_cache: dict[str, Any] = {}
+    _skills_backend: FilesystemBackend | None = None
+    _store: BaseStore | None = None
+    _store_context: object | None = None
 
     @classmethod
     async def init_checkpointer(cls) -> bool:
@@ -104,7 +99,7 @@ class AgentFactory:
         logger.info("[AGENT] Cache cleared")
 
     @classmethod
-    def get_checkpointer(cls) -> Union[AsyncPostgresSaver, InMemorySaver]:
+    def get_checkpointer(cls) -> AsyncPostgresSaver | InMemorySaver:
         """获取 checkpointer 实例
 
         如果尚未初始化，会自动初始化。
@@ -150,8 +145,8 @@ class AgentFactory:
         """
         try:
             if settings.database_url:
-                from langgraph.store.postgres.aio import AsyncPostgresStore
                 import asyncpg
+                from langgraph.store.postgres.aio import AsyncPostgresStore
 
                 # 先确保 pgvector 扩展已安装
                 conn = await asyncpg.connect(settings.database_url)
@@ -228,7 +223,7 @@ class AgentFactory:
             )
         )
 
-        skills_dir = str((Path(settings.storage_dir).resolve() / "skills"))
+        skills_dir = str(Path(settings.storage_dir).resolve() / "skills")
         skills_file_backend = FilesystemBackend(
             root_dir=skills_dir,
             virtual_mode=True,
@@ -424,7 +419,7 @@ class AgentFactory:
 
         logger.info("[AGENT] Starting concurrent warmup...")
 
-        async def create_agent_safe(is_expert: bool, thinking: bool) -> Optional[str]:
+        async def create_agent_safe(is_expert: bool, thinking: bool) -> str | None:
             """安全创建 Agent，返回缓存键或 None"""
             try:
                 cls.create_chat_agent(is_expert, thinking)

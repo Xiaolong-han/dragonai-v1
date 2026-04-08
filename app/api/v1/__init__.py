@@ -1,4 +1,4 @@
 
-from app.api.v1 import auth, conversations, files, knowledge, tools, models, chat
+from app.api.v1 import auth, chat, conversations, files, knowledge, models, tools
 
-__all__ = ["auth", "conversations", "files", "knowledge", "tools", "models", "chat"]
+__all__ = ["auth", "chat", "conversations", "files", "knowledge", "models", "tools"]

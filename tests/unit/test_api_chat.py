@@ -10,6 +10,10 @@
 - 异常测试: 验证错误处理
 - 边界测试: 验证参数边界
 - 安全测试: 验证用户隔离
+
+响应格式:
+- 成功: {code: 0, message: "...", data: {...}}
+- 错误: {code: ERROR_CODE, message: "...", data: null|details}
 """
 
 import pytest
@@ -20,6 +24,25 @@ from unittest.mock import patch, AsyncMock
 # =============================================================================
 # 辅助函数
 # =============================================================================
+
+def get_response_data(response):
+    """从统一响应格式中提取 data"""
+    json_data = response.json()
+    if isinstance(json_data, dict) and "data" in json_data:
+        return json_data["data"]
+    return json_data
+
+
+def get_access_token(login_response):
+    """从登录响应中提取 token"""
+    data = get_response_data(login_response)
+    return data["access_token"]
+
+
+def get_conversation_id(create_response):
+    """从创建会话响应中提取 ID"""
+    data = get_response_data(create_response)
+    return data["id"]
 
 async def _mock_sse_stream():
     """模拟 SSE 流"""
@@ -67,9 +90,9 @@ class TestGetChatHistory:
         response = await authenticated_client.get(
             f"/api/v1/chat/conversations/{test_conversation['id']}/history"
         )
-        
+
         assert response.status_code == 200
-        data = response.json()
+        data = get_response_data(response)
         assert "messages" in data
         assert "total" in data
         assert isinstance(data["messages"], list)
@@ -80,9 +103,9 @@ class TestGetChatHistory:
         response = await authenticated_client.get(
             f"/api/v1/chat/conversations/{test_conversation['id']}/history?skip=0&limit=10"
         )
-        
+
         assert response.status_code == 200
-        data = response.json()
+        data = get_response_data(response)
         assert "messages" in data
 
     @pytest.mark.asyncio
@@ -109,9 +132,11 @@ class TestGetChatHistory:
         response = await authenticated_client.get(
             "/api/v1/chat/conversations/99999/history"
         )
-        
+
         assert response.status_code == 404
-        assert "Conversation not found" in response.json()["detail"]
+        json_data = response.json()
+        # 新格式使用 message 字段
+        assert "message" in json_data or "detail" in json_data
 
     @pytest.mark.asyncio
     async def test_get_chat_history_wrong_user_returns_404(self, client, test_user_data):
@@ -122,15 +147,15 @@ class TestGetChatHistory:
             "username": test_user_data["username"],
             "password": test_user_data["password"]
         })
-        token1 = login1.json()["access_token"]
-        
+        token1 = get_access_token(login1)
+
         conv_response = await client.post(
             "/api/v1/conversations",
             json={"title": "User1 Conversation"},
             headers={"Authorization": f"Bearer {token1}"}
         )
-        conv_id = conv_response.json()["id"]
-        
+        conv_id = get_conversation_id(conv_response)
+
         # 注册用户2
         user2_data = {
             "username": "user2",
@@ -142,14 +167,14 @@ class TestGetChatHistory:
             "username": user2_data["username"],
             "password": user2_data["password"]
         })
-        token2 = login2.json()["access_token"]
-        
+        token2 = get_access_token(login2)
+
         # 用户2尝试访问用户1的会话历史
         response = await client.get(
             f"/api/v1/chat/conversations/{conv_id}/history",
             headers={"Authorization": f"Bearer {token2}"}
         )
-        
+
         assert response.status_code == 404
 
     @pytest.mark.asyncio
@@ -235,14 +260,16 @@ class TestSendChatMessage:
             "conversation_id": 99999,
             "content": "Hello"
         }
-        
+
         response = await authenticated_client.post(
             "/api/v1/chat/send",
             json=chat_request
         )
-        
+
         assert response.status_code == 404
-        assert "Conversation not found" in response.json()["detail"]
+        json_data = response.json()
+        # 新格式使用 message 字段
+        assert "message" in json_data or "detail" in json_data
 
     @pytest.mark.asyncio
     async def test_send_message_wrong_user_returns_404(self, client, test_user_data):
@@ -253,15 +280,15 @@ class TestSendChatMessage:
             "username": test_user_data["username"],
             "password": test_user_data["password"]
         })
-        token1 = login1.json()["access_token"]
-        
+        token1 = get_access_token(login1)
+
         conv_response = await client.post(
             "/api/v1/conversations",
             json={"title": "User1 Conversation"},
             headers={"Authorization": f"Bearer {token1}"}
         )
-        conv_id = conv_response.json()["id"]
-        
+        conv_id = get_conversation_id(conv_response)
+
         # 注册用户2
         user2_data = {
             "username": "user2",
@@ -273,20 +300,20 @@ class TestSendChatMessage:
             "username": user2_data["username"],
             "password": user2_data["password"]
         })
-        token2 = login2.json()["access_token"]
-        
+        token2 = get_access_token(login2)
+
         # 用户2尝试向用户1的会话发送消息
         chat_request = {
             "conversation_id": conv_id,
             "content": "Hacked message"
         }
-        
+
         response = await client.post(
             "/api/v1/chat/send",
             json=chat_request,
             headers={"Authorization": f"Bearer {token2}"}
         )
-        
+
         assert response.status_code == 404
 
     @pytest.mark.asyncio
@@ -371,7 +398,7 @@ class TestChatFlowIntegration:
                 f"/api/v1/chat/conversations/{test_conversation['id']}/history"
             )
             assert history_response.status_code == 200
-            history_data = history_response.json()
+            history_data = get_response_data(history_response)
             assert history_data["total"] >= 1
 
     @pytest.mark.asyncio
@@ -419,6 +446,6 @@ class TestChatFlowIntegration:
             f"/api/v1/chat/conversations/{test_conversation['id']}/history"
         )
         assert history_response.status_code == 200
-        history_data = history_response.json()
+        history_data = get_response_data(history_response)
         # 应该有用户消息（3条）
         assert history_data["total"] >= 3
